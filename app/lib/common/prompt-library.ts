@@ -9,7 +9,7 @@ import {
   getAllCustomPrompts,
 } from '~/lib/stores/customPrompts';
 import { processTemplate, type TemplateContext } from './prompts/template-processor';
-import { mergeSections, buildPromptFromSections, DEFAULT_PROMPT_INTRO } from './prompts/sections';
+import { mergeSections, buildPromptFromSections, DEFAULT_PROMPT_INTRO, DEFAULT_SECTIONS } from './prompts/sections';
 
 export interface PromptOptions {
   cwd: string;
@@ -63,7 +63,52 @@ export class PromptLibrary {
       description: 'An Experimental version of the prompt for lower token usage',
       get: (options) => optimized(options),
     },
+    'zoom-app': {
+      label: 'Zoom App Mode',
+      description: 'Enforces Zoom Marketplace app constraints and best practices for building Zoom Apps',
+      get: (options) => PromptLibrary._getZoomAppPrompt(options),
+    },
   };
+
+  /**
+   * Generate the Zoom App specific prompt
+   */
+  private static _getZoomAppPrompt(options: PromptOptions): string {
+    const templateContext = this._buildTemplateContext(options);
+
+    // Build Zoom-specific sections
+    const sections = {
+      ...DEFAULT_SECTIONS,
+    };
+
+    // Build the prompt with Zoom-specific intro
+    const intro = `You are Bolt, an expert AI assistant specializing in Zoom Marketplace App development. You have deep knowledge of the Zoom Apps SDK (@zoom/appssdk), OAuth 2.0 flows, webhook handling, and Zoom's security requirements.`;
+
+    const parts: string[] = [intro];
+
+    // Add system constraints
+    parts.push(sections.systemConstraints);
+
+    // Add Zoom-specific instructions (most important for this mode)
+    parts.push(sections.zoomAppInstructions);
+
+    // Add code formatting
+    parts.push(sections.codeFormattingInfo);
+
+    // Add chain of thought
+    parts.push(sections.chainOfThought);
+
+    // Add artifact instructions
+    parts.push(sections.artifactInstructions);
+
+    // Add design instructions (with Zoom styling overrides)
+    parts.push(sections.designInstructions);
+
+    const rawPrompt = parts.join('\n\n');
+
+    // Process template variables
+    return processTemplate(rawPrompt, templateContext);
+  }
 
   /**
    * Get the list of all available prompts (built-in + custom)

@@ -17,6 +17,7 @@ export interface PromptSections {
   designInstructions?: string;
   mobileAppInstructions?: string;
   chainOfThought?: string;
+  zoomAppInstructions?: string;
 }
 
 /**
@@ -50,6 +51,10 @@ export const PROMPT_SECTION_META: Record<keyof PromptSections, { label: string; 
   chainOfThought: {
     label: 'Chain of Thought',
     description: 'Instructions for reasoning and step-by-step thinking',
+  },
+  zoomAppInstructions: {
+    label: 'Zoom App Instructions',
+    description: 'Zoom Marketplace SDK integration, OAuth proxy, webhooks, and security requirements',
   },
 };
 

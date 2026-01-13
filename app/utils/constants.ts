@@ -144,4 +144,12 @@ export const STARTER_TEMPLATES: Template[] = [
     tags: ['solidjs'],
     icon: 'i-bolt:solidjs',
   },
+  {
+    name: 'Zoom App',
+    label: 'Zoom Marketplace App',
+    description: 'Zoom App starter template with SDK integration, OAuth proxy, and Marketplace-ready structure',
+    githubRepo: 'zoom-jaredallen/bolt-zoom-app-template',
+    tags: ['zoom', 'meeting', 'video', 'marketplace', 'oauth', 'sdk'],
+    icon: 'i-bolt:zoom',
+  },
 ];

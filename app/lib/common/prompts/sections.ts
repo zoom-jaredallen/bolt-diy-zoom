@@ -246,6 +246,85 @@ export const DEFAULT_SECTIONS: Required<PromptSections> = {
 
   [Rest of response...]"
 </chain_of_thought_instructions>`,
+
+  zoomAppInstructions: `<zoom_app_instructions>
+  You are building a Zoom Marketplace App. Follow these CRITICAL requirements:
+
+  ZOOM SDK INTEGRATION:
+  - ALWAYS use @zoom/appssdk for client-side Zoom integration
+  - Import zoomSdk from '@zoom/appssdk' and call zoomSdk.config() before any API calls
+  - Use zoomSdk.callZoomApi() for meeting controls, NOT direct REST API calls
+  - Handle zoomSdk.addEventListener() for Zoom events (onMeeting, onMessage, etc.)
+  - Initialize the SDK with: await zoomSdk.config({ capabilities: [...] })
+
+  OAUTH REQUIREMENTS:
+  - Use bolt.diy's OAuth proxy: https://zoomvibes.j4red4llen.com/api/oauth/proxy/start?provider=zoom
+  - OAuth callback URL: https://zoomvibes.j4red4llen.com/api/oauth/proxy/callback
+  - NEVER store OAuth tokens client-side; use httpOnly cookies or server-side sessions
+  - Request ONLY necessary scopes: meeting:read, meeting:write, user:read
+  - Implement token refresh before expiry using the refresh_token
+
+  WEBHOOK HANDLING:
+  - Use bolt.diy's webhook proxy for development: POST /api/webhook/session to get sessionId
+  - Configure webhooks in Zoom Marketplace to point to: https://zoomvibes.j4red4llen.com/api/webhook/proxy/{sessionId}
+  - Poll GET /api/webhook/poll/{sessionId} to receive webhook events (every 5 seconds recommended)
+  - Validate webhook signatures using the verification token from Zoom
+
+  SECURITY REQUIREMENTS:
+  - Validate all Zoom context headers (x-zoom-app-context)
+  - Use Content Security Policy headers compatible with Zoom client
+  - NEVER expose Client Secret in client-side code - keep it server-side only
+  - Implement state parameter for OAuth CSRF protection
+  - Store secrets in environment variables (.env.local)
+
+  UI/UX REQUIREMENTS:
+  - Design for embedded mode (inside Zoom client) with compact layouts
+  - Support both light and dark themes matching Zoom's color scheme:
+    - Light: bg #FFFFFF, text #232333
+    - Dark: bg #242424, text #FFFFFF
+  - Handle window resize events for different Zoom panel sizes (sidebar: 280px-400px)
+  - Provide loading states while waiting for Zoom SDK initialization
+  - Use Zoom's blue accent color: #0E71EB
+
+  MANIFEST REQUIREMENTS:
+  - Home URL must be HTTPS and publicly accessible (not WebContainer preview URL)
+  - Redirect URLs must include: https://zoomvibes.j4red4llen.com/api/oauth/proxy/callback
+  - Scopes in manifest must match OAuth request scopes exactly
+  - Short description: max 50 characters
+  - Long description: max 4000 characters
+  - Include proper icons: 80x80 for sidebar, 460x460 for listing
+
+  PROJECT STRUCTURE:
+  - Use Vite + React + TypeScript as the base
+  - Install @zoom/appssdk as a dependency
+  - Create src/lib/zoom.ts for Zoom SDK utilities
+  - Create src/hooks/useZoom.ts for React hooks
+  - Store manifest at public/manifest.json
+  - Environment variables in .env.local (gitignored)
+
+  EXAMPLE ZOOM SDK INITIALIZATION:
+  \`\`\`typescript
+  import zoomSdk from '@zoom/appssdk';
+  
+  async function initZoom() {
+    try {
+      const configResponse = await zoomSdk.config({
+        capabilities: [
+          'getMeetingContext',
+          'getUserContext',
+          'openUrl',
+          'showNotification'
+        ]
+      });
+      console.log('Zoom SDK configured:', configResponse);
+      return configResponse;
+    } catch (error) {
+      console.error('Failed to configure Zoom SDK:', error);
+      throw error;
+    }
+  }
+  \`\`\`
+</zoom_app_instructions>`,
 };
 
 /**
