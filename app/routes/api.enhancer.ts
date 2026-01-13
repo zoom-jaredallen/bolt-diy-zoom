@@ -110,11 +110,24 @@ async function enhancerAction({ context, request }: ActionFunctionArgs) {
       }
     })();
 
-    // Return the text stream directly since it's already text data
-    return new Response(result.textStream, {
+    /*
+     * Convert text stream to byte stream for Cloudflare workerd compatibility
+     * The workerd runtime requires ReadableStream to return bytes, not strings
+     */
+    const encoder = new TextEncoder();
+    const byteStream = result.textStream.pipeThrough(
+      new TransformStream({
+        transform(chunk, controller) {
+          // Encode text chunk to bytes
+          controller.enqueue(encoder.encode(chunk));
+        },
+      }),
+    );
+
+    return new Response(byteStream, {
       status: 200,
       headers: {
-        'Content-Type': 'text/event-stream',
+        'Content-Type': 'text/plain; charset=utf-8',
         Connection: 'keep-alive',
         'Cache-Control': 'no-cache',
       },

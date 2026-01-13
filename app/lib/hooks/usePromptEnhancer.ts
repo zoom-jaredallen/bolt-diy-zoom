@@ -33,18 +33,25 @@ export function usePromptEnhancer() {
       requestBody.apiKeys = apiKeys;
     }
 
-    const response = await fetch('/api/enhancer', {
-      method: 'POST',
-      body: JSON.stringify(requestBody),
-    });
-
-    const reader = response.body?.getReader();
-
     const originalInput = input;
 
-    if (reader) {
-      const decoder = new TextDecoder();
+    try {
+      const response = await fetch('/api/enhancer', {
+        method: 'POST',
+        body: JSON.stringify(requestBody),
+      });
 
+      if (!response.ok) {
+        throw new Error(`Enhancer API returned ${response.status}: ${response.statusText}`);
+      }
+
+      const reader = response.body?.getReader();
+
+      if (!reader) {
+        throw new Error('No response body reader available');
+      }
+
+      const decoder = new TextDecoder();
       let _input = '';
       let _error;
 
@@ -66,19 +73,28 @@ export function usePromptEnhancer() {
         }
       } catch (error) {
         _error = error;
+      }
+
+      // Handle errors or empty responses
+      if (_error) {
+        logger.error('Error during streaming:', _error);
         setInput(originalInput);
-      } finally {
-        if (_error) {
-          logger.error(_error);
-        }
-
-        setEnhancingPrompt(false);
-        setPromptEnhanced(true);
-
+      } else if (!_input || _input.trim() === '') {
+        // Response was empty - restore original input
+        logger.warn('Empty response from enhancer, restoring original input');
+        setInput(originalInput);
+      } else {
+        // Success - set the final enhanced input
         setTimeout(() => {
           setInput(_input);
         });
       }
+    } catch (error) {
+      logger.error('Enhancer request failed:', error);
+      setInput(originalInput);
+    } finally {
+      setEnhancingPrompt(false);
+      setPromptEnhanced(true);
     }
   };
 

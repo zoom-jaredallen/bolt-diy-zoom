@@ -185,7 +185,8 @@ export default function FeaturesTab() {
         description: 'Get the latest updates from the main branch',
         icon: 'i-ph:git-branch',
         enabled: isLatestBranch,
-        tooltip: 'Enabled by default to receive updates from the main development branch',
+        tooltip:
+          'For desktop/local deployments only. Does not apply to Docker/Kubernetes container deployments - use CI/CD pipeline to rebuild images instead.',
       },
       {
         id: 'autoSelectTemplate',

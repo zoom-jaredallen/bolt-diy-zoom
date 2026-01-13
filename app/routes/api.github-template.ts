@@ -1,21 +1,8 @@
 import { json } from '@remix-run/cloudflare';
-import JSZip from 'jszip';
+import { getApiKeysFromCookie } from '~/lib/api/cookies';
 
-// Function to detect if we're running in Cloudflare
-function isCloudflareEnvironment(context: any): boolean {
-  // Check if we're in production AND have Cloudflare Pages specific env vars
-  const isProduction = process.env.NODE_ENV === 'production';
-  const hasCfPagesVars = !!(
-    context?.cloudflare?.env?.CF_PAGES ||
-    context?.cloudflare?.env?.CF_PAGES_URL ||
-    context?.cloudflare?.env?.CF_PAGES_COMMIT_SHA
-  );
-
-  return isProduction && hasCfPagesVars;
-}
-
-// Cloudflare-compatible method using GitHub Contents API
-async function fetchRepoContentsCloudflare(repo: string, githubToken?: string) {
+// Primary method using GitHub Contents API - works for all repositories
+async function fetchRepoContentsAPI(repo: string, githubToken?: string) {
   const baseUrl = 'https://api.github.com';
 
   // Get repository info to find default branch
@@ -120,87 +107,6 @@ async function fetchRepoContentsCloudflare(repo: string, githubToken?: string) {
   return fileContents;
 }
 
-// Your existing method for non-Cloudflare environments
-async function fetchRepoContentsZip(repo: string, githubToken?: string) {
-  const baseUrl = 'https://api.github.com';
-
-  // Get the latest release
-  const releaseResponse = await fetch(`${baseUrl}/repos/${repo}/releases/latest`, {
-    headers: {
-      Accept: 'application/vnd.github.v3+json',
-      'User-Agent': 'bolt.diy-app',
-      ...(githubToken ? { Authorization: `Bearer ${githubToken}` } : {}),
-    },
-  });
-
-  if (!releaseResponse.ok) {
-    throw new Error(`GitHub API error: ${releaseResponse.status} - ${releaseResponse.statusText}`);
-  }
-
-  const releaseData = (await releaseResponse.json()) as any;
-  const zipballUrl = releaseData.zipball_url;
-
-  // Fetch the zipball
-  const zipResponse = await fetch(zipballUrl, {
-    headers: {
-      ...(githubToken ? { Authorization: `Bearer ${githubToken}` } : {}),
-    },
-  });
-
-  if (!zipResponse.ok) {
-    throw new Error(`Failed to fetch release zipball: ${zipResponse.status}`);
-  }
-
-  // Get the zip content as ArrayBuffer
-  const zipArrayBuffer = await zipResponse.arrayBuffer();
-
-  // Use JSZip to extract the contents
-  const zip = await JSZip.loadAsync(zipArrayBuffer);
-
-  // Find the root folder name
-  let rootFolderName = '';
-  zip.forEach((relativePath) => {
-    if (!rootFolderName && relativePath.includes('/')) {
-      rootFolderName = relativePath.split('/')[0];
-    }
-  });
-
-  // Extract all files
-  const promises = Object.keys(zip.files).map(async (filename) => {
-    const zipEntry = zip.files[filename];
-
-    // Skip directories
-    if (zipEntry.dir) {
-      return null;
-    }
-
-    // Skip the root folder itself
-    if (filename === rootFolderName) {
-      return null;
-    }
-
-    // Remove the root folder from the path
-    let normalizedPath = filename;
-
-    if (rootFolderName && filename.startsWith(rootFolderName + '/')) {
-      normalizedPath = filename.substring(rootFolderName.length + 1);
-    }
-
-    // Get the file content
-    const content = await zipEntry.async('string');
-
-    return {
-      name: normalizedPath.split('/').pop() || '',
-      path: normalizedPath,
-      content,
-    };
-  });
-
-  const results = await Promise.all(promises);
-
-  return results.filter(Boolean);
-}
-
 export async function loader({ request, context }: { request: Request; context: any }) {
   const url = new URL(request.url);
   const repo = url.searchParams.get('repo');
@@ -210,17 +116,27 @@ export async function loader({ request, context }: { request: Request; context: 
   }
 
   try {
-    // Access environment variables from Cloudflare context or process.env
+    // Get API keys from cookies (client-side token)
+    const cookieHeader = request.headers.get('Cookie');
+    const apiKeys = getApiKeysFromCookie(cookieHeader);
+
+    /*
+     * Get GitHub token from multiple sources (priority order):
+     * 1. Cookie-based token (from client)
+     * 2. Server environment variables
+     */
     const githubToken =
-      context?.cloudflare?.env?.GITHUB_TOKEN || process.env.GITHUB_TOKEN || process.env.VITE_GITHUB_ACCESS_TOKEN;
+      apiKeys.GITHUB_API_KEY ||
+      apiKeys.VITE_GITHUB_ACCESS_TOKEN ||
+      context?.cloudflare?.env?.GITHUB_TOKEN ||
+      process.env.GITHUB_TOKEN ||
+      process.env.VITE_GITHUB_ACCESS_TOKEN;
 
-    let fileList;
-
-    if (isCloudflareEnvironment(context)) {
-      fileList = await fetchRepoContentsCloudflare(repo, githubToken);
-    } else {
-      fileList = await fetchRepoContentsZip(repo, githubToken);
-    }
+    /*
+     * Use the Contents API method as primary - works for all repositories
+     * regardless of whether they have releases
+     */
+    const fileList = await fetchRepoContentsAPI(repo, githubToken);
 
     // Filter out .git files for both methods
     const filteredFiles = fileList.filter((file: any) => !file.path.startsWith('.git'));

@@ -19,6 +19,7 @@ import ProfileTab from '~/components/@settings/tabs/profile/ProfileTab';
 import SettingsTab from '~/components/@settings/tabs/settings/SettingsTab';
 import NotificationsTab from '~/components/@settings/tabs/notifications/NotificationsTab';
 import FeaturesTab from '~/components/@settings/tabs/features/FeaturesTab';
+import PromptsTab from '~/components/@settings/tabs/prompts/PromptsTab';
 import { DataTab } from '~/components/@settings/tabs/data/DataTab';
 import { EventLogsTab } from '~/components/@settings/tabs/event-logs/EventLogsTab';
 import GitHubTab from '~/components/@settings/tabs/github/GitHubTab';
@@ -131,6 +132,8 @@ export const ControlPanel = ({ open, onClose }: ControlPanelProps) => {
         return <NotificationsTab />;
       case 'features':
         return <FeaturesTab />;
+      case 'prompts':
+        return <PromptsTab />;
       case 'data':
         return <DataTab />;
       case 'cloud-providers':

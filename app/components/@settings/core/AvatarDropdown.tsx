@@ -123,7 +123,10 @@ export const AvatarDropdown = ({ onSelectTab }: AvatarDropdownProps) => {
               'group',
             )}
             onClick={() =>
-              window.open('https://github.com/stackblitz-labs/bolt.diy/issues/new?template=bug_report.yml', '_blank')
+              window.open(
+                'https://github.com/zoom-jaredallen/bolt-diy-zoom/issues/new?template=bug_report.yml',
+                '_blank',
+              )
             }
           >
             <div className="i-ph:bug w-4 h-4 text-gray-400 group-hover:text-purple-500 dark:group-hover:text-purple-400 transition-colors" />

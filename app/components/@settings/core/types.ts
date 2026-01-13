@@ -8,6 +8,7 @@ export type TabType =
   | 'settings'
   | 'notifications'
   | 'features'
+  | 'prompts'
   | 'data'
   | 'cloud-providers'
   | 'local-providers'
@@ -71,6 +72,7 @@ export const TAB_LABELS: Record<TabType, string> = {
   settings: 'Settings',
   notifications: 'Notifications',
   features: 'Features',
+  prompts: 'Prompts',
   data: 'Data Management',
   'cloud-providers': 'Cloud Providers',
   'local-providers': 'Local Providers',
