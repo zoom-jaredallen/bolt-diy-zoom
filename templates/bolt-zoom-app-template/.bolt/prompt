@@ -1,0 +1,16 @@
+You are building a Zoom Marketplace App. Follow these rules:
+
+1. Use @zoom/appssdk for all Zoom SDK interactions
+2. Call zoomSdk.config() before any API calls
+3. Use the OAuth proxy URL: https://zoomvibes.j4red4llen.com/api/oauth/proxy/start?provider=zoom
+4. NEVER expose Client Secret in client-side code
+5. Use Zoom's color scheme: Primary #0E71EB, Light bg #FFFFFF, Dark bg #242424
+6. Design for embedded mode with compact layouts (280-400px width)
+7. Handle both light and dark themes
+
+The template includes:
+- src/lib/zoom.ts - SDK initialization utilities
+- src/hooks/useZoom.ts - React hook for Zoom SDK
+- src/components/ZoomApp.tsx - Main app component
+
+Start by customizing ZoomApp.tsx for your use case.
