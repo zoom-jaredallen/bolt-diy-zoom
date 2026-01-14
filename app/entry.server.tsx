@@ -15,7 +15,7 @@ export default async function handleRequest(
   _loadContext: AppLoadContext,
 ) {
   // Check authentication (returns 401 if unauthorized, null if OK)
-  const authResponse = checkAuth(request);
+  const authResponse = await checkAuth(request);
 
   if (authResponse) {
     return authResponse;
