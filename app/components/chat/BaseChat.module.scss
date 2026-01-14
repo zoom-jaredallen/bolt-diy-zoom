@@ -17,7 +17,10 @@
 .Chat {
   opacity: 1;
   transition: max-width 0.2s ease;
+}
 
+/* Only constrain max-width when chat has started (workbench may be visible) */
+.BaseChat[data-chat-started='true'] .Chat {
   @media (min-width: 1024px) {
     max-width: calc(100% - var(--workbench-width, 0px));
   }

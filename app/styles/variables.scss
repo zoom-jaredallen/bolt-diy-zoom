@@ -1,5 +1,4 @@
 /* Color Tokens Light Theme (Day Mode) - Zoom Color Scheme */
-:root,
 :root[data-theme='light'] {
   --bolt-elements-borderColor: theme('colors.alpha.gray.10');
   --bolt-elements-borderColorActive: theme('colors.accent.500');
@@ -107,7 +106,6 @@
 }
 
 /* Color Tokens Dark Theme (Night Mode) - Zoom Color Scheme */
-:root,
 :root[data-theme='dark'] {
   --bolt-elements-borderColor: theme('colors.alpha.white.10');
   --bolt-elements-borderColorActive: #0b5cff;
