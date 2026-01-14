@@ -8,7 +8,6 @@ import {
   getClientIP,
   isAuthEnabled,
 } from '~/lib/auth.server';
-import { verifyRecaptcha, isRecaptchaEnabled } from '~/lib/recaptcha.server';
 
 export async function action({ request }: ActionFunctionArgs) {
   // Only allow POST
@@ -41,21 +40,11 @@ export async function action({ request }: ActionFunctionArgs) {
   const formData = await request.formData();
   const username = formData.get('username')?.toString() || '';
   const password = formData.get('password')?.toString() || '';
-  const recaptchaToken = formData.get('recaptchaToken')?.toString() || '';
   const redirectTo = formData.get('redirect')?.toString() || '/';
 
   // Validate required fields
   if (!username || !password) {
     return json({ error: 'Username and password are required' }, { status: 400 });
-  }
-
-  // Verify reCAPTCHA if enabled
-  if (isRecaptchaEnabled()) {
-    const recaptchaValid = await verifyRecaptcha(recaptchaToken, ip);
-
-    if (!recaptchaValid) {
-      return json({ error: 'reCAPTCHA verification failed. Please try again.' }, { status: 400 });
-    }
   }
 
   // Validate credentials

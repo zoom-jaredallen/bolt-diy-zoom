@@ -1,12 +1,9 @@
 import { json, redirect, type LoaderFunctionArgs, type MetaFunction } from '@remix-run/cloudflare';
 import { useLoaderData, useSearchParams } from '@remix-run/react';
-import { useState, useEffect, useRef, useCallback } from 'react';
-import { isRecaptchaEnabled, getRecaptchaSiteKey } from '~/lib/recaptcha.server';
+import { useState } from 'react';
 import { isAuthEnabled, checkRateLimit, getClientIP } from '~/lib/auth.server';
 
 interface LoaderData {
-  recaptchaEnabled: boolean;
-  recaptchaSiteKey: string | null;
   rateLimited: boolean;
   resetIn: number;
   remainingAttempts: number;
@@ -16,17 +13,6 @@ interface LoginResponse {
   success?: boolean;
   error?: string;
   redirect?: string;
-}
-
-declare global {
-  interface Window {
-    grecaptcha: {
-      ready: (callback: () => void) => void;
-      execute: (siteKey: string, options: { action: string }) => Promise<string>;
-      reset: () => void;
-    };
-    onRecaptchaLoad: () => void;
-  }
 }
 
 export const meta: MetaFunction = () => {
@@ -41,12 +27,8 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
   const ip = getClientIP(request);
   const rateLimit = checkRateLimit(ip);
-  const recaptchaEnabled = isRecaptchaEnabled();
-  const recaptchaSiteKey = recaptchaEnabled ? getRecaptchaSiteKey() : null;
 
   return json<LoaderData>({
-    recaptchaEnabled,
-    recaptchaSiteKey,
     rateLimited: !rateLimit.allowed,
     resetIn: rateLimit.resetIn,
     remainingAttempts: rateLimit.remainingAttempts,
@@ -54,61 +36,13 @@ export async function loader({ request }: LoaderFunctionArgs) {
 }
 
 export default function LoginPage() {
-  const { recaptchaEnabled, recaptchaSiteKey, rateLimited, resetIn, remainingAttempts } = useLoaderData<LoaderData>();
+  const { rateLimited, resetIn, remainingAttempts } = useLoaderData<LoaderData>();
   const [searchParams] = useSearchParams();
   const redirectTo = searchParams.get('redirect') || '/';
   const errorParam = searchParams.get('error');
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState(errorParam || '');
-  const [recaptchaReady, setRecaptchaReady] = useState(false);
-  const formRef = useRef<HTMLFormElement>(null);
-  const pendingFormData = useRef<FormData | null>(null);
-
-  // Initialize reCAPTCHA when loaded
-  useEffect(() => {
-    if (recaptchaEnabled && recaptchaSiteKey) {
-      window.onRecaptchaLoad = () => {
-        setRecaptchaReady(true);
-      };
-
-      // Check if already loaded
-      if (window.grecaptcha?.ready) {
-        window.grecaptcha.ready(() => {
-          setRecaptchaReady(true);
-        });
-      }
-    }
-  }, [recaptchaEnabled, recaptchaSiteKey]);
-
-  // Submit the form with reCAPTCHA token
-  const submitWithToken = useCallback(
-    async (formData: FormData, recaptchaToken: string) => {
-      formData.append('recaptchaToken', recaptchaToken);
-      formData.append('redirect', redirectTo);
-
-      try {
-        const response = await fetch('/api/login', {
-          method: 'POST',
-          body: formData,
-        });
-
-        const data = (await response.json()) as LoginResponse;
-
-        if (response.ok && data.success) {
-          window.location.href = data.redirect || '/';
-        } else {
-          setError(data.error || 'Login failed');
-        }
-      } catch {
-        setError('Network error. Please try again.');
-      } finally {
-        setIsSubmitting(false);
-        pendingFormData.current = null;
-      }
-    },
-    [redirectTo],
-  );
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -117,30 +51,25 @@ export default function LoginPage() {
 
     const form = e.currentTarget;
     const formData = new FormData(form);
+    formData.append('redirect', redirectTo);
 
-    // If reCAPTCHA is enabled, get token using invisible v2/v3
-    if (recaptchaEnabled && recaptchaSiteKey && window.grecaptcha) {
-      try {
-        // Store form data for callback
-        pendingFormData.current = formData;
+    try {
+      const response = await fetch('/api/login', {
+        method: 'POST',
+        body: formData,
+      });
 
-        // Execute invisible reCAPTCHA (v2 invisible or v3)
-        const token = await window.grecaptcha.execute(recaptchaSiteKey, { action: 'login' });
+      const data = (await response.json()) as LoginResponse;
 
-        if (token) {
-          await submitWithToken(formData, token);
-        } else {
-          setError('reCAPTCHA verification failed. Please try again.');
-          setIsSubmitting(false);
-        }
-      } catch (err) {
-        console.error('reCAPTCHA error:', err);
-        setError('reCAPTCHA error. Please try again.');
-        setIsSubmitting(false);
+      if (response.ok && data.success) {
+        window.location.href = data.redirect || '/';
+      } else {
+        setError(data.error || 'Login failed');
       }
-    } else {
-      // No reCAPTCHA, submit directly
-      await submitWithToken(formData, '');
+    } catch {
+      setError('Network error. Please try again.');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -159,7 +88,7 @@ export default function LoginPage() {
             <p>Please try again in {Math.ceil(resetIn / 60)} minute(s).</p>
           </div>
         ) : (
-          <form ref={formRef} onSubmit={handleSubmit} className="space-y-6">
+          <form onSubmit={handleSubmit} className="space-y-6">
             {error && <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">{error}</div>}
 
             <div>
@@ -191,10 +120,10 @@ export default function LoginPage() {
 
             <button
               type="submit"
-              disabled={isSubmitting || rateLimited || (recaptchaEnabled && !recaptchaReady)}
+              disabled={isSubmitting || rateLimited}
               className="w-full py-3 px-4 bg-accent-500 hover:bg-accent-600 text-white font-medium rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {isSubmitting ? 'Signing in...' : recaptchaEnabled && !recaptchaReady ? 'Loading...' : 'Sign In'}
+              {isSubmitting ? 'Signing in...' : 'Sign In'}
             </button>
 
             {remainingAttempts < 5 && (
@@ -202,22 +131,9 @@ export default function LoginPage() {
                 {remainingAttempts} attempt(s) remaining before lockout
               </p>
             )}
-
-            {recaptchaEnabled && (
-              <p className="text-xs text-bolt-elements-textTertiary text-center">Protected by reCAPTCHA</p>
-            )}
           </form>
         )}
       </div>
-
-      {/* Load reCAPTCHA v3/invisible script */}
-      {recaptchaEnabled && recaptchaSiteKey && (
-        <script
-          src={`https://www.google.com/recaptcha/api.js?render=${recaptchaSiteKey}&onload=onRecaptchaLoad`}
-          async
-          defer
-        />
-      )}
     </div>
   );
 }
