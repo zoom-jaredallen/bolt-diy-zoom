@@ -62,18 +62,28 @@ export function isPublicPath(pathname: string): boolean {
 /**
  * Get admin password from environment
  * Returns null if not configured (auth disabled)
+ * @param cloudflareEnv - Optional Cloudflare environment (for Workers/wrangler)
  */
-export function getAdminPassword(): string | null {
-  const password = process.env.ADMIN_PASSWORD || (globalThis as any).process?.env?.ADMIN_PASSWORD || null;
+export function getAdminPassword(cloudflareEnv?: Record<string, string>): string | null {
+  /*
+   * Try Cloudflare env first (for Workers/Kubernetes deployments)
+   * Then fall back to process.env (for local development)
+   */
+  const password =
+    cloudflareEnv?.ADMIN_PASSWORD ||
+    process.env.ADMIN_PASSWORD ||
+    (globalThis as any).process?.env?.ADMIN_PASSWORD ||
+    null;
 
   return password && password !== 'your_secure_password_here' ? password : null;
 }
 
 /**
  * Check if authentication is enabled
+ * @param cloudflareEnv - Optional Cloudflare environment (for Workers/wrangler)
  */
-export function isAuthEnabled(): boolean {
-  return getAdminPassword() !== null;
+export function isAuthEnabled(cloudflareEnv?: Record<string, string>): boolean {
+  return getAdminPassword(cloudflareEnv) !== null;
 }
 
 /**
@@ -206,9 +216,14 @@ export async function destroySession(cookieHeader: string | null): Promise<strin
 
 /**
  * Validate credentials
+ * @param cloudflareEnv - Optional Cloudflare environment (for Workers/wrangler)
  */
-export function validateCredentials(username: string, password: string): boolean {
-  const adminPassword = getAdminPassword();
+export function validateCredentials(
+  username: string,
+  password: string,
+  cloudflareEnv?: Record<string, string>,
+): boolean {
+  const adminPassword = getAdminPassword(cloudflareEnv);
 
   if (!adminPassword) {
     return false;
@@ -220,8 +235,9 @@ export function validateCredentials(username: string, password: string): boolean
 /**
  * Check authentication for a request
  * Returns null if authorized, or a redirect/401 Response if not
+ * @param cloudflareEnv - Optional Cloudflare environment (for Workers/wrangler)
  */
-export async function checkAuth(request: Request): Promise<Response | null> {
+export async function checkAuth(request: Request, cloudflareEnv?: Record<string, string>): Promise<Response | null> {
   const url = new URL(request.url);
   const pathname = url.pathname;
 
@@ -231,7 +247,7 @@ export async function checkAuth(request: Request): Promise<Response | null> {
   }
 
   // Skip auth if not configured
-  if (!isAuthEnabled()) {
+  if (!isAuthEnabled(cloudflareEnv)) {
     return null;
   }
 
@@ -252,7 +268,7 @@ export async function checkAuth(request: Request): Promise<Response | null> {
       const credentials = atob(base64Credentials);
       const [user, pass] = credentials.split(':');
 
-      if (validateCredentials(user, pass)) {
+      if (validateCredentials(user, pass, cloudflareEnv)) {
         return null;
       }
     } catch {

@@ -12,10 +12,13 @@ export default async function handleRequest(
   responseStatusCode: number,
   responseHeaders: Headers,
   remixContext: any,
-  _loadContext: AppLoadContext,
+  loadContext: AppLoadContext,
 ) {
+  // Extract Cloudflare env from context (for Workers/Kubernetes deployments)
+  const cloudflareEnv = (loadContext as any)?.cloudflare?.env as Record<string, string> | undefined;
+
   // Check authentication (returns 401 if unauthorized, null if OK)
-  const authResponse = await checkAuth(request);
+  const authResponse = await checkAuth(request, cloudflareEnv);
 
   if (authResponse) {
     return authResponse;
