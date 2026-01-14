@@ -1,4 +1,4 @@
-import { json, type LoaderFunctionArgs, type MetaFunction } from '@remix-run/cloudflare';
+import { json, redirect, type LoaderFunctionArgs, type MetaFunction } from '@remix-run/cloudflare';
 import { useLoaderData, useSearchParams } from '@remix-run/react';
 import { useState } from 'react';
 import { isRecaptchaEnabled, getRecaptchaSiteKey } from '~/lib/recaptcha.server';
@@ -25,7 +25,7 @@ export const meta: MetaFunction = () => {
 export async function loader({ request }: LoaderFunctionArgs) {
   // If auth is not enabled, redirect to home
   if (!isAuthEnabled()) {
-    return Response.redirect(new URL('/', request.url).toString(), 302);
+    throw redirect('/');
   }
 
   const ip = getClientIP(request);

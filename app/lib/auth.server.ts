@@ -267,7 +267,13 @@ export async function checkAuth(request: Request): Promise<Response | null> {
     const loginUrl = new URL('/login', request.url);
     loginUrl.searchParams.set('redirect', pathname);
 
-    return Response.redirect(loginUrl.toString(), 302);
+    // Use proper redirect response (Response.redirect causes issues with Remix/Cloudflare)
+    return new Response(null, {
+      status: 302,
+      headers: {
+        Location: loginUrl.toString(),
+      },
+    });
   }
 
   // Return 401 for API requests
