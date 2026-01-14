@@ -295,6 +295,7 @@ export async function createZoomAppWithRetry(
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
       console.log(`[ZoomAPI] Attempt ${attempt}/${maxRetries} to create Zoom App`);
+
       const result = await createZoomApp(credentials, request);
 
       return result;

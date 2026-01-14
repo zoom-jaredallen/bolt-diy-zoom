@@ -58,9 +58,13 @@ export function GitUrlImport() {
       try {
         const { workdir, data } = await gitClone(repoUrl);
 
-        // Execute post-create hook if template has one (e.g., Zoom App creation)
+        /*
+         * Execute post-create hook if template has one (e.g., Zoom App creation)
+         */
+
         try {
           setLoadingMessage('Checking for template hooks...');
+
           const wc = await webcontainer;
           const hookResult = await executeHook({ gitUrl: repoUrl, webcontainer: wc });
 
