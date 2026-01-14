@@ -6,7 +6,9 @@ import { ClientOnly } from 'remix-utils/client-only';
 import { BaseChat } from '~/components/chat/BaseChat';
 import { Chat } from '~/components/chat/Chat.client';
 import { useGit } from '~/lib/hooks/useGit';
+import { useTemplateHook } from '~/lib/hooks/useTemplateHook';
 import { useChatHistory } from '~/lib/persistence';
+import { webcontainer } from '~/lib/webcontainer';
 import { createCommandsMessage, detectProjectCommands, escapeBoltTags } from '~/utils/projectCommands';
 import { LoadingOverlay } from '~/components/ui/LoadingOverlay';
 import { toast } from 'react-toastify';
@@ -40,8 +42,10 @@ export function GitUrlImport() {
   const [searchParams] = useSearchParams();
   const { ready: historyReady, importChat } = useChatHistory();
   const { ready: gitReady, gitClone } = useGit();
+  const { executeHook, isExecuting: isHookExecuting, progress: hookProgress } = useTemplateHook();
   const [imported, setImported] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [loadingMessage, setLoadingMessage] = useState('Please wait while we clone the repository...');
 
   const importRepo = async (repoUrl?: string) => {
     if (!gitReady && !historyReady) {
@@ -53,6 +57,28 @@ export function GitUrlImport() {
 
       try {
         const { workdir, data } = await gitClone(repoUrl);
+
+        // Execute post-create hook if template has one (e.g., Zoom App creation)
+        try {
+          setLoadingMessage('Checking for template hooks...');
+          const wc = await webcontainer;
+          const hookResult = await executeHook({ gitUrl: repoUrl, webcontainer: wc });
+
+          if (hookResult) {
+            if (hookResult.success) {
+              toast.success(hookResult.message);
+            } else {
+              // Non-fatal: show warning but continue with import
+              toast.warning(hookResult.message);
+            }
+          }
+        } catch (hookError) {
+          console.warn('[GitUrlImport] Template hook failed:', hookError);
+
+          // Non-fatal: continue with import
+        }
+
+        setLoadingMessage('Importing project files...');
 
         if (importChat) {
           const filePaths = Object.keys(data).filter((filePath) => !ig.ignores(filePath));
@@ -134,12 +160,19 @@ ${escapeBoltTags(file.content)}
     setImported(true);
   }, [searchParams, historyReady, gitReady, imported]);
 
+  // Update loading message when hook is executing
+  useEffect(() => {
+    if (isHookExecuting && hookProgress) {
+      setLoadingMessage(hookProgress);
+    }
+  }, [isHookExecuting, hookProgress]);
+
   return (
     <ClientOnly fallback={<BaseChat />}>
       {() => (
         <>
           <Chat />
-          {loading && <LoadingOverlay message="Please wait while we clone the repository..." />}
+          {(loading || isHookExecuting) && <LoadingOverlay message={loadingMessage} />}
         </>
       )}
     </ClientOnly>

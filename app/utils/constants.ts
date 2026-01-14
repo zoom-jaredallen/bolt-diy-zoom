@@ -151,5 +151,9 @@ export const STARTER_TEMPLATES: Template[] = [
     githubRepo: 'zoom-jaredallen/bolt-zoom-app-template',
     tags: ['zoom', 'meeting', 'video', 'marketplace', 'oauth', 'sdk'],
     icon: 'i-bolt:zoom',
+    postCreateHook: {
+      type: 'zoom-app-create',
+      required: false, // App works without auto-creation, user can create manually
+    },
   },
 ];
