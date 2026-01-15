@@ -50,14 +50,21 @@ function getEnvVar(context: any, key: string): string {
  * Creates a new Zoom App via the Marketplace API
  */
 export async function action({ request, context }: ActionFunctionArgs) {
+  console.log('[ZoomAppCreate] POST request received');
+
   // Only allow POST requests
   if (request.method !== 'POST') {
+    console.log('[ZoomAppCreate] Method not allowed:', request.method);
+
     return json({ error: 'Method not allowed' }, { status: 405 });
   }
 
   try {
     // Parse request body
     const body = await request.json();
+
+    console.log('[ZoomAppCreate] Request body:', JSON.stringify(body, null, 2));
+
     const { appName, scopes, webhookSessionId, shortDescription, longDescription } = body as {
       appName?: string;
       scopes?: string[];

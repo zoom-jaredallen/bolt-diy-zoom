@@ -2,6 +2,21 @@ import ignore from 'ignore';
 import type { ProviderInfo } from '~/types/model';
 import type { Template } from '~/types/template';
 import { STARTER_TEMPLATES } from './constants';
+import type { ZoomAppCreateResult } from '~/types/zoom';
+
+export interface TemplateHookResult {
+  hookType: string;
+  success: boolean;
+  message: string;
+  data?: ZoomAppCreateResult;
+  envContent?: string;
+}
+
+export interface GetTemplatesResult {
+  assistantMessage: string;
+  userMessage: string;
+  hookResult?: TemplateHookResult;
+}
 
 const starterTemplateSelectionPrompt = (templates: Template[]) => `
 You are an experienced developer who helps people choose the best starter template for their projects.
@@ -248,8 +263,121 @@ Now that the Template is imported please continue with my original request
 IMPORTANT: Dont Forget to install the dependencies before running the app by using \`npm install && npm run dev\`
 `;
 
+  // Execute post-create hook if template has one (e.g., Zoom App creation)
+  let hookResult: TemplateHookResult | undefined;
+
+  if (template.postCreateHook) {
+    console.log('[getTemplates] Template has post-create hook:', template.postCreateHook.type);
+
+    try {
+      hookResult = await executePostCreateHook(template, title || template.name);
+    } catch (error) {
+      console.error('[getTemplates] Post-create hook error:', error);
+
+      // Non-fatal: return hook error but still provide template files
+      hookResult = {
+        hookType: template.postCreateHook.type,
+        success: false,
+        message: error instanceof Error ? error.message : 'Unknown error executing post-create hook',
+      };
+    }
+  }
+
   return {
     assistantMessage,
     userMessage,
+    hookResult,
+  } as GetTemplatesResult;
+}
+
+/**
+ * Execute the post-create hook for a template
+ */
+async function executePostCreateHook(template: Template, projectName: string): Promise<TemplateHookResult> {
+  const hook = template.postCreateHook;
+
+  if (!hook) {
+    throw new Error('No post-create hook defined');
+  }
+
+  console.log(`[executePostCreateHook] Executing hook type: ${hook.type} for project: ${projectName}`);
+
+  switch (hook.type) {
+    case 'zoom-app-create':
+      return executeZoomAppCreateHook(projectName);
+    default:
+      console.warn(`[executePostCreateHook] Unknown hook type: ${hook.type}`);
+
+      return {
+        hookType: hook.type,
+        success: false,
+        message: `Unknown hook type: ${hook.type}`,
+      };
+  }
+}
+
+/**
+ * Execute the Zoom App creation hook
+ */
+async function executeZoomAppCreateHook(projectName: string): Promise<TemplateHookResult> {
+  console.log(`[executeZoomAppCreateHook] Creating Zoom App: ${projectName}`);
+
+  // First check if the API is configured
+  const statusResponse = await fetch('/api/zoom-app-create');
+  const status = (await statusResponse.json()) as { configured: boolean; credentials: Record<string, string> };
+
+  console.log('[executeZoomAppCreateHook] API status:', status);
+
+  if (!status.configured) {
+    console.warn('[executeZoomAppCreateHook] Zoom API not configured');
+
+    return {
+      hookType: 'zoom-app-create',
+      success: false,
+      message:
+        'Zoom S2S OAuth credentials not configured. You can manually create the app at marketplace.zoom.us and update .env with the credentials.',
+    };
+  }
+
+  // Call the Zoom App creation API
+  console.log('[executeZoomAppCreateHook] Calling /api/zoom-app-create...');
+
+  const response = await fetch('/api/zoom-app-create', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      appName: projectName,
+      shortDescription: `${projectName} - Zoom App`,
+    }),
+  });
+
+  console.log('[executeZoomAppCreateHook] API response status:', response.status);
+
+  const result = (await response.json()) as { success?: boolean; error?: string; code?: string } & Partial<
+    ZoomAppCreateResult & { envContent?: string }
+  >;
+
+  console.log('[executeZoomAppCreateHook] API response:', JSON.stringify(result, null, 2));
+
+  if (!response.ok || !result.success) {
+    const errorResult = result;
+
+    return {
+      hookType: 'zoom-app-create',
+      success: false,
+      message: `Failed to create Zoom App: ${errorResult.error || 'Unknown error'}`,
+    };
+  }
+
+  const successResult = result as ZoomAppCreateResult & { envContent?: string };
+
+  return {
+    hookType: 'zoom-app-create',
+    success: true,
+    message: `Zoom App "${successResult.appName}" created successfully!`,
+    data: successResult,
+    envContent: successResult.envContent,
   };
 }
