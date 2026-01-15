@@ -112,12 +112,7 @@ export function WebhookEventLog() {
           <span className="text-xs text-bolt-elements-textSecondary">{filteredEvents.length} events</span>
         </div>
         {connection.recentEvents.length > 0 && (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => clearWebhookEvents()}
-            className="flex items-center gap-1"
-          >
+          <Button variant="outline" size="sm" onClick={() => clearWebhookEvents()} className="flex items-center gap-1">
             <div className="i-ph:trash w-4 h-4" />
             Clear
           </Button>

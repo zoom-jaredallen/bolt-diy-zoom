@@ -124,7 +124,9 @@ export default function ZoomTab() {
   };
 
   const handleDeleteApp = (appId: string) => {
-    if (confirm('Are you sure you want to remove this app from your list? This does not delete it from Zoom Marketplace.')) {
+    if (
+      confirm('Are you sure you want to remove this app from your list? This does not delete it from Zoom Marketplace.')
+    ) {
       removeZoomApp(appId);
     }
   };

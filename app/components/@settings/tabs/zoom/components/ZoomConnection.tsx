@@ -52,7 +52,13 @@ export function ZoomConnection() {
             'bg-bolt-elements-background-depth-1 border border-bolt-elements-borderColor',
           )}
         >
-          <div className={classNames(getStatusIcon(connection.hasClientId), 'w-5 h-5', getStatusColor(connection.hasClientId))} />
+          <div
+            className={classNames(
+              getStatusIcon(connection.hasClientId),
+              'w-5 h-5',
+              getStatusColor(connection.hasClientId),
+            )}
+          />
           <div>
             <div className="text-xs text-bolt-elements-textSecondary">ZOOM_CLIENT_ID</div>
             <div className={classNames('text-sm font-medium', getStatusColor(connection.hasClientId))}>
@@ -68,7 +74,13 @@ export function ZoomConnection() {
             'bg-bolt-elements-background-depth-1 border border-bolt-elements-borderColor',
           )}
         >
-          <div className={classNames(getStatusIcon(connection.hasClientSecret), 'w-5 h-5', getStatusColor(connection.hasClientSecret))} />
+          <div
+            className={classNames(
+              getStatusIcon(connection.hasClientSecret),
+              'w-5 h-5',
+              getStatusColor(connection.hasClientSecret),
+            )}
+          />
           <div>
             <div className="text-xs text-bolt-elements-textSecondary">ZOOM_CLIENT_SECRET</div>
             <div className={classNames('text-sm font-medium', getStatusColor(connection.hasClientSecret))}>
@@ -84,7 +96,13 @@ export function ZoomConnection() {
             'bg-bolt-elements-background-depth-1 border border-bolt-elements-borderColor',
           )}
         >
-          <div className={classNames(getStatusIcon(connection.hasAccountId), 'w-5 h-5', getStatusColor(connection.hasAccountId))} />
+          <div
+            className={classNames(
+              getStatusIcon(connection.hasAccountId),
+              'w-5 h-5',
+              getStatusColor(connection.hasAccountId),
+            )}
+          />
           <div>
             <div className="text-xs text-bolt-elements-textSecondary">ZOOM_ACCOUNT_ID</div>
             <div className={classNames('text-sm font-medium', getStatusColor(connection.hasAccountId))}>
