@@ -16,7 +16,7 @@ interface LoginResponse {
 }
 
 export const meta: MetaFunction = () => {
-  return [{ title: 'Login - bolt.diy' }];
+  return [{ title: 'Login - Zoom App Builder' }];
 };
 
 export async function loader({ request }: LoaderFunctionArgs) {
@@ -77,8 +77,8 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-bolt-elements-background-depth-1">
       <div className="w-full max-w-md p-8 bg-bolt-elements-background-depth-2 rounded-lg shadow-lg border border-bolt-elements-borderColor">
         <div className="text-center mb-8">
-          <img src="/logo.svg" alt="bolt.diy" className="h-12 mx-auto mb-4" />
-          <h1 className="text-2xl font-bold text-bolt-elements-textPrimary">Login to bolt.diy</h1>
+          <img src="/logo.svg" alt="Zoom App Builder" className="h-12 mx-auto mb-4" />
+          <h1 className="text-2xl font-bold text-bolt-elements-textPrimary">Login to Zoom App Builder</h1>
           <p className="text-bolt-elements-textSecondary mt-2">Enter your credentials to continue</p>
         </div>
 
