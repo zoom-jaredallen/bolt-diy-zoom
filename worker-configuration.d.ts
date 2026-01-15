@@ -1,4 +1,5 @@
 interface Env {
+  ADMIN_PASSWORD: string;
   RUNNING_IN_DOCKER: Settings;
   DEFAULT_NUM_CTX: Settings;
   ANTHROPIC_API_KEY: string;
