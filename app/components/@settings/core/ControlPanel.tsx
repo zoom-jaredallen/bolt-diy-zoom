@@ -30,6 +30,7 @@ import NetlifyTab from '~/components/@settings/tabs/netlify/NetlifyTab';
 import CloudProvidersTab from '~/components/@settings/tabs/providers/cloud/CloudProvidersTab';
 import LocalProvidersTab from '~/components/@settings/tabs/providers/local/LocalProvidersTab';
 import McpTab from '~/components/@settings/tabs/mcp/McpTab';
+import ZoomTab from '~/components/@settings/tabs/zoom/ZoomTab';
 
 interface ControlPanelProps {
   open: boolean;
@@ -154,6 +155,8 @@ export const ControlPanel = ({ open, onClose }: ControlPanelProps) => {
         return <EventLogsTab />;
       case 'mcp':
         return <McpTab />;
+      case 'zoom':
+        return <ZoomTab />;
 
       default:
         return null;

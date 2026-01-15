@@ -38,6 +38,16 @@ const SupabaseIcon = () => (
   </svg>
 );
 
+// Zoom icon component
+const ZoomIcon = () => (
+  <svg viewBox="0 0 24 24" className="w-4 h-4">
+    <path
+      fill="currentColor"
+      d="M4.585 11.416a2.49 2.49 0 0 1 2.49-2.49h5.032c1.375 0 2.49 1.115 2.49 2.49v5.033a2.49 2.49 0 0 1-2.49 2.49H7.075a2.49 2.49 0 0 1-2.49-2.49v-5.033Zm11.622 2.19 3.503-2.626a.933.933 0 0 1 1.466.767v4.503a.933.933 0 0 1-1.466.767l-3.503-2.626v-.785Z"
+    />
+  </svg>
+);
+
 export const TAB_ICONS: Record<TabType, React.ComponentType<{ className?: string }>> = {
   profile: User,
   settings: Settings,
@@ -52,6 +62,7 @@ export const TAB_ICONS: Record<TabType, React.ComponentType<{ className?: string
   netlify: () => <NetlifyIcon />,
   vercel: () => <VercelIcon />,
   supabase: () => <SupabaseIcon />,
+  zoom: () => <ZoomIcon />,
   'event-logs': List,
   mcp: Wrench,
 };
@@ -70,6 +81,7 @@ export const TAB_LABELS: Record<TabType, string> = {
   netlify: 'Netlify',
   vercel: 'Vercel',
   supabase: 'Supabase',
+  zoom: 'Zoom',
   'event-logs': 'Event Logs',
   mcp: 'MCP Servers',
 };
@@ -88,6 +100,7 @@ export const TAB_DESCRIPTIONS: Record<TabType, string> = {
   netlify: 'Configure Netlify deployment settings',
   vercel: 'Manage Vercel projects and deployments',
   supabase: 'Setup Supabase database connection',
+  zoom: 'Manage Zoom Apps and Marketplace integration',
   'event-logs': 'View system events and logs',
   mcp: 'Configure MCP (Model Context Protocol) servers',
 };
@@ -104,9 +117,10 @@ export const DEFAULT_TAB_CONFIG = [
   { id: 'netlify', visible: true, window: 'user' as const, order: 7 },
   { id: 'vercel', visible: true, window: 'user' as const, order: 8 },
   { id: 'supabase', visible: true, window: 'user' as const, order: 9 },
-  { id: 'notifications', visible: true, window: 'user' as const, order: 10 },
-  { id: 'event-logs', visible: true, window: 'user' as const, order: 11 },
-  { id: 'mcp', visible: true, window: 'user' as const, order: 12 },
+  { id: 'zoom', visible: true, window: 'user' as const, order: 10 },
+  { id: 'notifications', visible: true, window: 'user' as const, order: 11 },
+  { id: 'event-logs', visible: true, window: 'user' as const, order: 12 },
+  { id: 'mcp', visible: true, window: 'user' as const, order: 13 },
 
   // User Window Tabs (In dropdown, initially hidden)
 ];
