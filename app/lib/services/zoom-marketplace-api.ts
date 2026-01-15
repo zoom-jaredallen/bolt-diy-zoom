@@ -120,8 +120,14 @@ export interface ZoomAppCreateResponse {
  * Error response from Zoom API
  */
 export interface ZoomApiError {
-  code: number;
-  message: string;
+  code?: number;
+  message?: string;
+  ok?: boolean;
+  error?: string;
+  errors?: Array<{
+    setting?: string;
+    message?: string;
+  }>;
 }
 
 /**
@@ -137,6 +143,10 @@ let tokenCache: TokenCache | null = null;
 
 /**
  * Default values for Zoom App creation
+ *
+ * Note: For General Apps (in-client Zoom Apps), the required scopes are different
+ * from Meeting/Webinar API scopes. The zoomapp:inmeeting scope is required for
+ * apps that run inside the Zoom client.
  */
 export const ZOOM_APP_DEFAULTS = {
   contact_name: 'Jared Allen',
@@ -145,7 +155,12 @@ export const ZOOM_APP_DEFAULTS = {
   domain_allow_list: ['zoomvibes.j4red4llen.com'],
   oauth_callback_url: 'https://zoomvibes.j4red4llen.com/api/oauth/proxy/callback',
   webhook_proxy_base: 'https://zoomvibes.j4red4llen.com/api/webhook/proxy',
-  default_scopes: ['meeting:read', 'meeting:write', 'user:read'],
+
+  /*
+   * Scopes for General Apps (in-client Zoom Apps)
+   * zoomapp:inmeeting - Required for in-client features (main_panel, collaborate)
+   */
+  default_scopes: ['zoomapp:inmeeting'],
 };
 
 /**
@@ -252,11 +267,23 @@ export async function createZoomApp(
 
     if (!response.ok) {
       const errorData = (await response.json().catch(() => ({}))) as ZoomApiError;
-      throw new ZoomMarketplaceError(
-        `App creation failed: ${errorData.message || response.statusText}`,
-        'APP_CREATION_FAILED',
-        response.status,
-      );
+
+      // Build detailed error message
+      let errorMessage = errorData.message || errorData.error || response.statusText;
+
+      if (errorData.errors && errorData.errors.length > 0) {
+        const details = errorData.errors.map((e) => `${e.setting}: ${e.message}`).join('; ');
+        errorMessage = `${errorMessage} - Details: ${details}`;
+      }
+
+      console.error('[ZoomAPI] App creation failed:', {
+        status: response.status,
+        error: errorData.error,
+        errors: errorData.errors,
+        message: errorMessage,
+      });
+
+      throw new ZoomMarketplaceError(`App creation failed: ${errorMessage}`, 'APP_CREATION_FAILED', response.status);
     }
 
     const data = (await response.json()) as ZoomAppCreateResponse;
