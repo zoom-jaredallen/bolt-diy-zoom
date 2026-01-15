@@ -1,7 +1,7 @@
 import { LLMManager } from '~/lib/modules/llm/manager';
 import type { Template } from '~/types/template';
 
-export const APP_VERSION = '1.0.2';
+export const APP_VERSION = '1.0.3';
 export const WORK_DIR_NAME = 'project';
 export const WORK_DIR = `/home/${WORK_DIR_NAME}`;
 export const MODIFICATIONS_TAG_NAME = 'bolt_file_modifications';
