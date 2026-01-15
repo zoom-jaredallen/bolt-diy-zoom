@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { useStore } from '@nanostores/react';
 import { workbenchStore } from '~/lib/stores/workbench';
 import { DeployButton } from '~/components/deploy/DeployButton';
@@ -9,13 +9,34 @@ interface HeaderActionButtonsProps {
 
 export function HeaderActionButtons({ chatStarted: _chatStarted }: HeaderActionButtonsProps) {
   const [activePreviewIndex] = useState(0);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
   const previews = useStore(workbenchStore.previews);
   const activePreview = previews[activePreviewIndex];
 
   const shouldShowButtons = activePreview;
 
+  const handleLogout = useCallback(async () => {
+    setIsLoggingOut(true);
+
+    try {
+      const response = await fetch('/api/logout', {
+        method: 'POST',
+      });
+
+      if (response.ok) {
+        window.location.href = '/login';
+      } else {
+        console.error('Logout failed');
+        setIsLoggingOut(false);
+      }
+    } catch (error) {
+      console.error('Logout error:', error);
+      setIsLoggingOut(false);
+    }
+  }, []);
+
   return (
-    <div className="flex items-center gap-1">
+    <div className="flex items-center gap-2">
       {/* Deploy Button */}
       {shouldShowButtons && <DeployButton />}
 
@@ -53,6 +74,17 @@ export function HeaderActionButtons({ chatStarted: _chatStarted }: HeaderActionB
           </button>
         </div>
       )}
+
+      {/* Logout Button */}
+      <button
+        onClick={handleLogout}
+        disabled={isLoggingOut}
+        className="flex items-center justify-center px-3 py-1.5 text-xs border border-bolt-elements-borderColor rounded-md bg-bolt-elements-background-depth-2 text-bolt-elements-textSecondary hover:bg-bolt-elements-background-depth-3 hover:text-bolt-elements-textPrimary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        title="Logout"
+      >
+        <div className="i-ph:sign-out mr-1.5" />
+        <span>{isLoggingOut ? 'Logging out...' : 'Logout'}</span>
+      </button>
     </div>
   );
 }

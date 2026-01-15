@@ -2,11 +2,13 @@ import { json, redirect, type LoaderFunctionArgs, type MetaFunction } from '@rem
 import { useLoaderData, useSearchParams } from '@remix-run/react';
 import { useState } from 'react';
 import { isAuthEnabled, checkRateLimit, getClientIP } from '~/lib/auth.server';
+import { APP_VERSION } from '~/utils/constants';
 
 interface LoaderData {
   rateLimited: boolean;
   resetIn: number;
   remainingAttempts: number;
+  appVersion: string;
 }
 
 interface LoginResponse {
@@ -19,9 +21,12 @@ export const meta: MetaFunction = () => {
   return [{ title: 'Login - Zoom App Builder' }];
 };
 
-export async function loader({ request }: LoaderFunctionArgs) {
+export async function loader({ request, context }: LoaderFunctionArgs) {
+  // Extract Cloudflare env from context (for Workers/Kubernetes deployments)
+  const cloudflareEnv = (context as any)?.cloudflare?.env as Record<string, string> | undefined;
+
   // If auth is not enabled, redirect to home
-  if (!isAuthEnabled()) {
+  if (!isAuthEnabled(cloudflareEnv)) {
     throw redirect('/');
   }
 
@@ -32,11 +37,12 @@ export async function loader({ request }: LoaderFunctionArgs) {
     rateLimited: !rateLimit.allowed,
     resetIn: rateLimit.resetIn,
     remainingAttempts: rateLimit.remainingAttempts,
+    appVersion: APP_VERSION,
   });
 }
 
 export default function LoginPage() {
-  const { rateLimited, resetIn, remainingAttempts } = useLoaderData<LoaderData>();
+  const { rateLimited, resetIn, remainingAttempts, appVersion } = useLoaderData<LoaderData>();
   const [searchParams] = useSearchParams();
   const redirectTo = searchParams.get('redirect') || '/';
   const errorParam = searchParams.get('error');
@@ -133,6 +139,8 @@ export default function LoginPage() {
             )}
           </form>
         )}
+
+        <p className="text-xs text-bolt-elements-textTertiary text-center mt-6">v{appVersion}</p>
       </div>
     </div>
   );
