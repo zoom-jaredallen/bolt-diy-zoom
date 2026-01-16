@@ -169,34 +169,120 @@ export async function action({ request, context }: ActionFunctionArgs) {
 /**
  * GET /api/oauth/proxy/dynamic
  *
- * Returns information about the endpoint
+ * Start OAuth flow via GET request with query parameters.
+ * This allows browser-clickable URLs like:
+ * /api/oauth/proxy/dynamic?provider=zoom&clientId=XXX&clientSecret=YYY&scopes=meeting:read:meeting,zoomapp:inmeeting
+ *
+ * If no query parameters are provided, returns endpoint info.
  */
-export async function loader() {
-  return json({
-    endpoint: '/api/oauth/proxy/dynamic',
-    method: 'POST',
-    description: 'Start OAuth flow with dynamic credentials for newly created apps',
-    supportedProviders: getSupportedProviders(),
-    requestSchema: {
-      provider: { type: 'string', required: true, description: 'OAuth provider (zoom, github, gitlab, google)' },
-      clientId: { type: 'string', required: true, description: 'OAuth client ID' },
-      clientSecret: { type: 'string', required: true, description: 'OAuth client secret' },
-      scopes: { type: 'string[]', required: false, description: 'OAuth scopes' },
-      appId: { type: 'string', required: false, description: 'App ID for reference' },
-      appName: { type: 'string', required: false, description: 'App name for reference' },
-      webcontainerId: { type: 'string', required: false, description: 'WebContainer ID' },
-      redirectAfterAuth: {
-        type: 'boolean',
-        required: false,
-        default: false,
-        description: 'If true, redirects to authorization URL immediately',
+export async function loader({ request, context }: ActionFunctionArgs) {
+  const url = new URL(request.url);
+
+  // Extract query parameters
+  const provider = url.searchParams.get('provider');
+  const clientId = url.searchParams.get('clientId');
+  const clientSecret = url.searchParams.get('clientSecret');
+  const scopesParam = url.searchParams.get('scopes');
+  const appId = url.searchParams.get('appId') || undefined;
+  const appName = url.searchParams.get('appName') || undefined;
+  const webcontainerId = url.searchParams.get('webcontainerId') || undefined;
+
+  // If no provider specified, return endpoint info
+  if (!provider) {
+    return json({
+      endpoint: '/api/oauth/proxy/dynamic',
+      methods: ['GET', 'POST'],
+      description: 'Start OAuth flow with dynamic credentials for newly created apps',
+      supportedProviders: getSupportedProviders(),
+      usage: {
+        GET: 'Add query params: ?provider=zoom&clientId=XXX&clientSecret=YYY&scopes=...',
+        POST: 'Send JSON body with same fields',
       },
-    },
-    responseSchema: {
-      success: { type: 'boolean' },
-      authorizationUrl: { type: 'string', description: 'URL to redirect user to for OAuth' },
-      sessionId: { type: 'string', description: 'Session ID for tracking' },
-      state: { type: 'string', description: 'State parameter for CSRF protection' },
-    },
-  });
+      requestSchema: {
+        provider: { type: 'string', required: true, description: 'OAuth provider (zoom, github, gitlab, google)' },
+        clientId: { type: 'string', required: true, description: 'OAuth client ID' },
+        clientSecret: { type: 'string', required: true, description: 'OAuth client secret' },
+        scopes: { type: 'string or comma-separated string', required: false, description: 'OAuth scopes' },
+        appId: { type: 'string', required: false, description: 'App ID for reference' },
+        appName: { type: 'string', required: false, description: 'App name for reference' },
+        webcontainerId: { type: 'string', required: false, description: 'WebContainer ID' },
+      },
+    });
+  }
+
+  // Validate required fields
+  if (!clientId || !clientSecret) {
+    return json(
+      {
+        success: false,
+        error: 'Missing required query parameters: clientId and clientSecret',
+      },
+      { status: 400 },
+    );
+  }
+
+  // Validate provider is supported
+  const supportedProviders = getSupportedProviders();
+
+  if (!supportedProviders.includes(provider.toLowerCase())) {
+    return json(
+      {
+        success: false,
+        error: `Unsupported provider: ${provider}`,
+        supportedProviders,
+      },
+      { status: 400 },
+    );
+  }
+
+  // Get public URL
+  const publicUrl = getEnvVar(context, 'VITE_PUBLIC_URL') || url.origin;
+
+  // Parse scopes (comma-separated string or default)
+  const defaultScopes: Record<string, string[]> = {
+    zoom: ['meeting:read:meeting', 'zoomapp:inmeeting'],
+    github: ['repo', 'user'],
+    gitlab: ['api', 'read_user', 'read_repository'],
+    google: ['openid', 'email', 'profile'],
+  };
+
+  const scopes = scopesParam
+    ? scopesParam.split(',').map((s) => s.trim())
+    : defaultScopes[provider.toLowerCase()] || [];
+
+  try {
+    // Create session with dynamic credentials
+    const session = await createDynamicOAuthSession(
+      provider.toLowerCase(),
+      scopes,
+      publicUrl,
+      {
+        clientId,
+        clientSecret,
+        appId,
+        appName,
+      },
+      webcontainerId,
+    );
+
+    // Build authorization URL
+    const authorizationUrl = buildDynamicAuthorizationUrl(session, publicUrl);
+
+    console.log(`[Dynamic OAuth GET] Created session for ${provider} app: ${appName || appId || 'unknown'}`);
+    console.log(`[Dynamic OAuth GET] Session ID: ${session.id}, State: ${session.state}`);
+    console.log(`[Dynamic OAuth GET] Redirecting to: ${authorizationUrl}`);
+
+    // Redirect directly to the authorization URL
+    return redirect(authorizationUrl);
+  } catch (error) {
+    console.error('[Dynamic OAuth GET] Error:', error);
+
+    return json(
+      {
+        success: false,
+        error: error instanceof Error ? error.message : 'An unexpected error occurred',
+      },
+      { status: 500 },
+    );
+  }
 }
