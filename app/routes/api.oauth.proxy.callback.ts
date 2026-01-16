@@ -25,6 +25,52 @@ function getEnvVar(context: any, key: string): string {
   return (context.cloudflare?.env as any)?.[key] || process.env[key] || '';
 }
 
+/**
+ * Exchange authorization code for tokens directly using provided credentials
+ * Used for Marketplace-initiated OAuth flow where we don't have a session
+ */
+async function exchangeCodeForTokensDirect(
+  clientId: string,
+  clientSecret: string,
+  code: string,
+  redirectUri: string,
+): Promise<{ access_token: string; refresh_token?: string; token_type: string; expires_in?: number; scope?: string }> {
+  const tokenUrl = 'https://zoom.us/oauth/token';
+
+  const params = new URLSearchParams({
+    grant_type: 'authorization_code',
+    code,
+    redirect_uri: redirectUri,
+  });
+
+  const authHeader = `Basic ${btoa(`${clientId}:${clientSecret}`)}`;
+
+  const response = await fetch(tokenUrl, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+      Authorization: authHeader,
+    },
+    body: params.toString(),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error('[exchangeCodeForTokensDirect] Token exchange failed:', errorText);
+    throw new Error(`Token exchange failed: ${response.status} ${response.statusText}`);
+  }
+
+  const tokens = (await response.json()) as {
+    access_token: string;
+    refresh_token?: string;
+    token_type: string;
+    expires_in?: number;
+    scope?: string;
+  };
+
+  return tokens;
+}
+
 export async function loader({ request, context }: LoaderFunctionArgs) {
   const url = new URL(request.url);
   const code = url.searchParams.get('code');
@@ -37,16 +83,9 @@ export async function loader({ request, context }: LoaderFunctionArgs) {
     return renderErrorPage(error, errorDescription || 'Unknown error occurred');
   }
 
-  // Validate required parameters
-  if (!code || !state) {
-    return renderErrorPage('invalid_request', 'Missing code or state parameter');
-  }
-
-  // Find session by state
-  const session = getOAuthSessionByState(state);
-
-  if (!session) {
-    return renderErrorPage('invalid_state', 'OAuth session expired or invalid. Please try again.');
+  // Validate code is present
+  if (!code) {
+    return renderErrorPage('invalid_request', 'Missing authorization code');
   }
 
   // Get environment variables
@@ -67,6 +106,54 @@ export async function loader({ request, context }: LoaderFunctionArgs) {
 
   // Get public URL for redirect
   const publicUrl = env.VITE_PUBLIC_URL || new URL(request.url).origin;
+  const redirectUri = `${publicUrl}/api/oauth/proxy/callback`;
+
+  /*
+   * Handle Marketplace-initiated OAuth flow (no state parameter)
+   * When Zoom Marketplace's "Add" or "Install" button is clicked, Zoom initiates
+   * the OAuth flow directly without going through our proxy, so there's no state.
+   */
+  if (!state) {
+    console.log('[OAuth Callback] No state parameter - handling Marketplace-initiated flow');
+
+    // For Marketplace flow, use environment credentials (Zoom client)
+    const clientId = env.ZOOM_OAUTH_CLIENT_ID || env.ZOOM_CLIENT_ID;
+    const clientSecret = env.ZOOM_OAUTH_CLIENT_SECRET || env.ZOOM_CLIENT_SECRET;
+
+    if (!clientId || !clientSecret) {
+      return renderErrorPage(
+        'configuration_error',
+        'Zoom OAuth credentials not configured. Please set ZOOM_CLIENT_ID and ZOOM_CLIENT_SECRET environment variables.',
+      );
+    }
+
+    try {
+      // Exchange code for tokens using environment credentials
+      const tokens = await exchangeCodeForTokensDirect(clientId, clientSecret, code, redirectUri);
+
+      console.log('[OAuth Callback] Marketplace flow token exchange successful');
+
+      // Generate a session ID for tracking
+      const sessionId = `marketplace-${Date.now()}`;
+
+      // Render success page
+      return renderSuccessPage('zoom', sessionId, undefined, tokens);
+    } catch (err) {
+      console.error('[OAuth Callback] Marketplace flow token exchange error:', err);
+
+      return renderErrorPage(
+        'token_exchange_failed',
+        err instanceof Error ? err.message : 'Failed to exchange authorization code for tokens',
+      );
+    }
+  }
+
+  // Standard flow with state parameter
+  const session = getOAuthSessionByState(state);
+
+  if (!session) {
+    return renderErrorPage('invalid_state', 'OAuth session expired or invalid. Please try again.');
+  }
 
   try {
     let tokens;
