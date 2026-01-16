@@ -3,6 +3,7 @@ import type { ProviderInfo } from '~/types/model';
 import type { Template } from '~/types/template';
 import { STARTER_TEMPLATES } from './constants';
 import type { ZoomAppCreateResult } from '~/types/zoom';
+import { addZoomApp, type ZoomApp } from '~/lib/stores/zoom';
 
 export interface TemplateHookResult {
   hookType: string;
@@ -415,6 +416,36 @@ async function executeZoomAppCreateHook(projectName: string): Promise<TemplateHo
   }
 
   const successResult = result as ZoomAppCreateResult & { envContent?: string };
+
+  // Add the created app to the Zoom store for display in Settings > Zoom
+  try {
+    const zoomApp: ZoomApp = {
+      appId: successResult.appId,
+      appName: successResult.appName,
+      appType: 'general',
+      status: 'draft',
+      createdAt: new Date().toISOString(),
+      scopes: ['meeting:read:meeting', 'zoomapp:inmeeting'],
+      credentials: {
+        development: {
+          clientId: successResult.credentials.clientId,
+          clientSecret: successResult.credentials.clientSecret,
+        },
+        production: {
+          clientId: successResult.credentials.clientId,
+          clientSecret: successResult.credentials.clientSecret,
+        },
+      },
+      shortDescription: `${projectName} - Zoom App`,
+    };
+
+    addZoomApp(zoomApp);
+    console.log('[executeZoomAppCreateHook] App added to Zoom store:', successResult.appId);
+  } catch (storeError) {
+    console.error('[executeZoomAppCreateHook] Failed to add app to store:', storeError);
+
+    // Non-fatal: continue with the result
+  }
 
   return {
     hookType: 'zoom-app-create',
