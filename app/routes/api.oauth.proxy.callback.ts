@@ -26,6 +26,18 @@ function getEnvVar(context: any, key: string): string {
 }
 
 /**
+ * Ensure URL uses HTTPS protocol
+ * Zoom and most OAuth providers require HTTPS for redirect URIs
+ */
+function ensureHttps(url: string): string {
+  if (url.startsWith('http://localhost') || url.startsWith('http://127.0.0.1')) {
+    return url;
+  }
+
+  return url.replace(/^http:\/\//i, 'https://');
+}
+
+/**
  * Exchange authorization code for tokens directly using provided credentials
  * Used for Marketplace-initiated OAuth flow where we don't have a session
  */
@@ -104,31 +116,53 @@ export async function loader({ request, context }: LoaderFunctionArgs) {
     VITE_PUBLIC_URL: getEnvVar(context, 'VITE_PUBLIC_URL'),
   };
 
-  // Get public URL for redirect
-  const publicUrl = env.VITE_PUBLIC_URL || new URL(request.url).origin;
+  // Get public URL for redirect (ensure HTTPS for OAuth providers)
+  const rawPublicUrl = env.VITE_PUBLIC_URL || new URL(request.url).origin;
+  const publicUrl = ensureHttps(rawPublicUrl);
   const redirectUri = `${publicUrl}/api/oauth/proxy/callback`;
 
   /*
    * Handle Marketplace-initiated OAuth flow (no state parameter)
    * When Zoom Marketplace's "Add" or "Install" button is clicked, Zoom initiates
    * the OAuth flow directly without going through our proxy, so there's no state.
+   *
+   * IMPORTANT: For Marketplace OAuth to work, you need to set the app's OAuth credentials:
+   * - ZOOM_OAUTH_CLIENT_ID: The Client ID of the created Zoom App (not S2S credentials)
+   * - ZOOM_OAUTH_CLIENT_SECRET: The Client Secret of the created Zoom App
+   *
+   * The S2S credentials (ZOOM_CLIENT_ID) are for API management, NOT for user OAuth.
    */
   if (!state) {
     console.log('[OAuth Callback] No state parameter - handling Marketplace-initiated flow');
 
-    // For Marketplace flow, use environment credentials (Zoom client)
-    const clientId = env.ZOOM_OAUTH_CLIENT_ID || env.ZOOM_CLIENT_ID;
-    const clientSecret = env.ZOOM_OAUTH_CLIENT_SECRET || env.ZOOM_CLIENT_SECRET;
+    // Prefer ZOOM_OAUTH credentials (app-specific), fall back to S2S (won't work for user OAuth)
+    const clientId = env.ZOOM_OAUTH_CLIENT_ID;
+    const clientSecret = env.ZOOM_OAUTH_CLIENT_SECRET;
 
+    // If no OAuth-specific credentials, show a helpful error
     if (!clientId || !clientSecret) {
-      return renderErrorPage(
-        'configuration_error',
-        'Zoom OAuth credentials not configured. Please set ZOOM_CLIENT_ID and ZOOM_CLIENT_SECRET environment variables.',
-      );
+      console.error('[OAuth Callback] Missing ZOOM_OAUTH_CLIENT_ID or ZOOM_OAUTH_CLIENT_SECRET');
+
+      const helpText = `
+To authorize via Zoom Marketplace, you need to configure the app's OAuth credentials:
+
+1. Set ZOOM_OAUTH_CLIENT_ID to your Zoom App's Client ID
+2. Set ZOOM_OAUTH_CLIENT_SECRET to your Zoom App's Client Secret
+
+These are different from S2S credentials (ZOOM_CLIENT_ID/ZOOM_CLIENT_SECRET).
+
+Alternatively, use the OAuth URL from the .env file in your project which includes the credentials.
+      `.trim();
+
+      return renderErrorPage('configuration_error', helpText);
     }
 
     try {
-      // Exchange code for tokens using environment credentials
+      console.log('[OAuth Callback] Using app OAuth credentials for token exchange');
+      console.log('[OAuth Callback] Client ID:', clientId.substring(0, 8) + '...');
+      console.log('[OAuth Callback] Redirect URI:', redirectUri);
+
+      // Exchange code for tokens using OAuth credentials
       const tokens = await exchangeCodeForTokensDirect(clientId, clientSecret, code, redirectUri);
 
       console.log('[OAuth Callback] Marketplace flow token exchange successful');
@@ -141,10 +175,22 @@ export async function loader({ request, context }: LoaderFunctionArgs) {
     } catch (err) {
       console.error('[OAuth Callback] Marketplace flow token exchange error:', err);
 
-      return renderErrorPage(
-        'token_exchange_failed',
-        err instanceof Error ? err.message : 'Failed to exchange authorization code for tokens',
-      );
+      // Provide helpful debugging info
+      const debugInfo = `
+Token exchange failed. This usually means:
+
+1. The OAuth credentials don't match the app that initiated the authorization
+2. The redirect URI doesn't match what's configured in the Zoom App
+
+Debug info:
+- Client ID: ${clientId.substring(0, 8)}...
+- Redirect URI: ${redirectUri}
+- Error: ${err instanceof Error ? err.message : 'Unknown error'}
+
+Try using the OAuth URL from your project's .env file instead of Marketplace's Add button.
+      `.trim();
+
+      return renderErrorPage('token_exchange_failed', debugInfo);
     }
   }
 

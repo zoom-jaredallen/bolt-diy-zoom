@@ -56,6 +56,19 @@ const SESSION_TTL = 10 * 60 * 1000;
 const TOKEN_TTL = 60 * 60 * 1000;
 
 /**
+ * Ensure URL uses HTTPS protocol
+ * Zoom and most OAuth providers require HTTPS for redirect URIs
+ */
+function ensureHttps(url: string): string {
+  if (url.startsWith('http://localhost') || url.startsWith('http://127.0.0.1')) {
+    // Allow localhost for local development
+    return url;
+  }
+
+  return url.replace(/^http:\/\//i, 'https://');
+}
+
+/**
  * Get OAuth provider configuration from environment variables
  */
 export function getOAuthProviderConfig(provider: string, env: Record<string, string>): OAuthProviderConfig | null {
@@ -227,9 +240,10 @@ export function getOAuthTokens(sessionId: string): OAuthTokens | null {
  * Build authorization URL
  */
 export function buildAuthorizationUrl(config: OAuthProviderConfig, session: OAuthSession, publicUrl: string): string {
+  const secureUrl = ensureHttps(publicUrl);
   const params = new URLSearchParams({
     client_id: config.clientId,
-    redirect_uri: `${publicUrl}/api/oauth/proxy/callback`,
+    redirect_uri: `${secureUrl}/api/oauth/proxy/callback`,
     response_type: 'code',
     state: session.state,
     scope: session.scopes.join(' '),
@@ -247,10 +261,11 @@ export async function exchangeCodeForTokens(
   code: string,
   publicUrl: string,
 ): Promise<OAuthTokens> {
+  const secureUrl = ensureHttps(publicUrl);
   const params = new URLSearchParams({
     grant_type: 'authorization_code',
     code,
-    redirect_uri: `${publicUrl}/api/oauth/proxy/callback`,
+    redirect_uri: `${secureUrl}/api/oauth/proxy/callback`,
     client_id: config.clientId,
     client_secret: config.clientSecret,
   });
@@ -344,9 +359,10 @@ export function buildDynamicAuthorizationUrl(session: OAuthSession, publicUrl: s
     throw new Error('Session does not have dynamic credentials');
   }
 
+  const secureUrl = ensureHttps(publicUrl);
   const params = new URLSearchParams({
     client_id: session.dynamicCredentials.clientId,
-    redirect_uri: `${publicUrl}/api/oauth/proxy/callback`,
+    redirect_uri: `${secureUrl}/api/oauth/proxy/callback`,
     response_type: 'code',
     state: session.state,
     scope: session.scopes.join(' '),
@@ -380,6 +396,8 @@ export async function exchangeCodeForTokensWithDynamicCredentials(
     throw new Error('Session does not have dynamic credentials');
   }
 
+  const secureUrl = ensureHttps(publicUrl);
+
   // Determine token URL based on provider
   let tokenUrl = 'https://zoom.us/oauth/token';
 
@@ -394,7 +412,7 @@ export async function exchangeCodeForTokensWithDynamicCredentials(
   const params = new URLSearchParams({
     grant_type: 'authorization_code',
     code,
-    redirect_uri: `${publicUrl}/api/oauth/proxy/callback`,
+    redirect_uri: `${secureUrl}/api/oauth/proxy/callback`,
     client_id: session.dynamicCredentials.clientId,
     client_secret: session.dynamicCredentials.clientSecret,
   });

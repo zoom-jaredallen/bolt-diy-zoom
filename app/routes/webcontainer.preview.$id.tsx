@@ -1,4 +1,4 @@
-import { json, type LoaderFunctionArgs } from '@remix-run/cloudflare';
+import { json, type LoaderFunctionArgs, type HeadersFunction } from '@remix-run/cloudflare';
 import { useLoaderData } from '@remix-run/react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
@@ -9,12 +9,19 @@ const PREVIEW_CHANNEL = 'preview-updates';
  * Required for apps to be loaded in Zoom client iframe
  * See: https://developers.zoom.us/docs/zoom-apps/security/owasp/
  */
-const OWASP_HEADERS = {
+const OWASP_HEADERS: Record<string, string> = {
   'Strict-Transport-Security': 'max-age=31536000; includeSubDomains',
   'X-Content-Type-Options': 'nosniff',
   'Content-Security-Policy': "frame-ancestors 'self' https://*.zoom.us",
   'Referrer-Policy': 'strict-origin-when-cross-origin',
   'X-Frame-Options': 'ALLOW-FROM https://*.zoom.us',
+};
+
+/**
+ * Headers export - Remix uses this to set headers on the final HTML response
+ */
+export const headers: HeadersFunction = () => {
+  return OWASP_HEADERS;
 };
 
 export async function loader({ params }: LoaderFunctionArgs) {

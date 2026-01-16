@@ -11,18 +11,26 @@
  * See: https://developers.zoom.us/docs/zoom-apps/security/owasp/
  */
 
-import { json, type LoaderFunctionArgs } from '@remix-run/cloudflare';
+import { json, type LoaderFunctionArgs, type HeadersFunction } from '@remix-run/cloudflare';
 
 /**
  * OWASP Security Headers required for Zoom Apps
  * Must be included in responses for apps to be loaded in Zoom client iframe.
  */
-const OWASP_HEADERS = {
+const OWASP_HEADERS: Record<string, string> = {
   'Strict-Transport-Security': 'max-age=31536000; includeSubDomains',
   'X-Content-Type-Options': 'nosniff',
   'Content-Security-Policy': "frame-ancestors 'self' https://*.zoom.us",
   'Referrer-Policy': 'strict-origin-when-cross-origin',
   'X-Frame-Options': 'ALLOW-FROM https://*.zoom.us',
+};
+
+/**
+ * Headers export - Remix uses this to set headers on the final HTML response
+ * This is the proper way to set security headers on rendered pages
+ */
+export const headers: HeadersFunction = () => {
+  return OWASP_HEADERS;
 };
 
 export async function loader({ request }: LoaderFunctionArgs) {
@@ -51,14 +59,8 @@ export async function loader({ request }: LoaderFunctionArgs) {
     );
   }
 
-  // Return HTML for browser requests
-  return new Response(null, {
-    status: 200,
-    headers: {
-      ...OWASP_HEADERS,
-      'Content-Type': 'text/html',
-    },
-  });
+  // Return data for the component - headers will be added by the headers export
+  return json({ ready: true }, { headers: OWASP_HEADERS });
 }
 
 export default function WebContainerPreviewBase() {
