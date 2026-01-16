@@ -26,6 +26,14 @@ export interface OAuthSession {
   webcontainerId?: string;
   createdAt: number;
   expiresAt: number;
+
+  // Dynamic credentials for newly created apps
+  dynamicCredentials?: {
+    clientId: string;
+    clientSecret: string;
+    appId?: string;
+    appName?: string;
+  };
 }
 
 export interface OAuthTokens {
@@ -282,4 +290,134 @@ function cleanupExpiredSessions(): void {
  */
 export function getSupportedProviders(): string[] {
   return ['zoom', 'github', 'gitlab', 'google'];
+}
+
+/**
+ * Create an OAuth session with dynamic credentials (for newly created apps)
+ */
+export async function createDynamicOAuthSession(
+  provider: string,
+  scopes: string[],
+  publicUrl: string,
+  dynamicCredentials: {
+    clientId: string;
+    clientSecret: string;
+    appId?: string;
+    appName?: string;
+  },
+  webcontainerId?: string,
+): Promise<OAuthSession> {
+  const sessionId = generateSecureString(16);
+  const state = generateSecureString(16);
+  const { codeVerifier } = await generatePKCE();
+
+  const session: OAuthSession = {
+    id: sessionId,
+    provider,
+    state,
+    codeVerifier,
+    redirectUri: publicUrl,
+    scopes,
+    webcontainerId,
+    createdAt: Date.now(),
+    expiresAt: Date.now() + SESSION_TTL,
+    dynamicCredentials,
+  };
+
+  oauthSessions.set(sessionId, session);
+
+  // Clean up expired sessions periodically
+  cleanupExpiredSessions();
+
+  console.log(
+    `[OAuth] Created dynamic session for ${provider} app: ${dynamicCredentials.appName || dynamicCredentials.appId}`,
+  );
+
+  return session;
+}
+
+/**
+ * Build authorization URL with dynamic credentials
+ */
+export function buildDynamicAuthorizationUrl(session: OAuthSession, publicUrl: string): string {
+  if (!session.dynamicCredentials) {
+    throw new Error('Session does not have dynamic credentials');
+  }
+
+  const params = new URLSearchParams({
+    client_id: session.dynamicCredentials.clientId,
+    redirect_uri: `${publicUrl}/api/oauth/proxy/callback`,
+    response_type: 'code',
+    state: session.state,
+    scope: session.scopes.join(' '),
+  });
+
+  // Determine authorization URL based on provider
+  let authorizationUrl = 'https://zoom.us/oauth/authorize';
+
+  if (session.provider === 'github') {
+    authorizationUrl = 'https://github.com/login/oauth/authorize';
+  } else if (session.provider === 'gitlab') {
+    authorizationUrl = 'https://gitlab.com/oauth/authorize';
+  } else if (session.provider === 'google') {
+    authorizationUrl = 'https://accounts.google.com/o/oauth2/v2/auth';
+    params.append('access_type', 'offline');
+    params.append('prompt', 'consent');
+  }
+
+  return `${authorizationUrl}?${params.toString()}`;
+}
+
+/**
+ * Exchange authorization code for tokens using dynamic credentials
+ */
+export async function exchangeCodeForTokensWithDynamicCredentials(
+  session: OAuthSession,
+  code: string,
+  publicUrl: string,
+): Promise<OAuthTokens> {
+  if (!session.dynamicCredentials) {
+    throw new Error('Session does not have dynamic credentials');
+  }
+
+  // Determine token URL based on provider
+  let tokenUrl = 'https://zoom.us/oauth/token';
+
+  if (session.provider === 'github') {
+    tokenUrl = 'https://github.com/login/oauth/access_token';
+  } else if (session.provider === 'gitlab') {
+    tokenUrl = 'https://gitlab.com/oauth/token';
+  } else if (session.provider === 'google') {
+    tokenUrl = 'https://oauth2.googleapis.com/token';
+  }
+
+  const params = new URLSearchParams({
+    grant_type: 'authorization_code',
+    code,
+    redirect_uri: `${publicUrl}/api/oauth/proxy/callback`,
+    client_id: session.dynamicCredentials.clientId,
+    client_secret: session.dynamicCredentials.clientSecret,
+  });
+
+  console.log(`[OAuth] Exchanging code for tokens with dynamic credentials for ${session.provider}`);
+
+  const response = await fetch(tokenUrl, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+      Accept: 'application/json',
+    },
+    body: params.toString(),
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    console.error(`[OAuth] Token exchange failed for ${session.provider}:`, error);
+    throw new Error(`Token exchange failed: ${error}`);
+  }
+
+  const tokens = (await response.json()) as OAuthTokens;
+  console.log(`[OAuth] Token exchange successful for ${session.provider}`);
+
+  return tokens;
 }

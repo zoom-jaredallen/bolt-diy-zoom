@@ -12,7 +12,20 @@ export interface ZoomAppCreateResult {
   success: boolean;
   appId: string;
   appName: string;
+
+  /**
+   * OAuth authorization URL that goes through our proxy.
+   * This URL properly handles state parameter for CSRF protection.
+   * Use this URL to authorize users for the app.
+   */
   oauthAuthorizeUrl: string;
+
+  /**
+   * Direct Zoom OAuth URL (for reference only).
+   * DO NOT use this directly - it doesn't include the state parameter
+   * needed for proper OAuth flow.
+   */
+  directOAuthUrl?: string;
   credentials: ZoomAppCredentials;
   envContent: string;
 }

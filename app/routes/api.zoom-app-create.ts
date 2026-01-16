@@ -31,6 +31,7 @@ import {
   buildZoomAppCreateRequest,
   createZoomAppWithRetry,
   generateEnvFileContent,
+  generateProxyOAuthUrl,
   ZoomMarketplaceError,
   ZOOM_APP_DEFAULTS,
   type ZoomCredentials,
@@ -126,15 +127,24 @@ export async function action({ request, context }: ActionFunctionArgs) {
     // Generate .env file content
     const envContent = generateEnvFileContent(result, trimmedAppName);
 
+    // Generate a proper OAuth URL that goes through our proxy (includes state parameter)
+    const proxyOAuthUrl = generateProxyOAuthUrl(result.credentials, result.app_id, trimmedAppName);
+
     console.log('[ZoomAppCreate] Zoom App created successfully:', result.app_id);
     console.log('[ZoomAppCreate] envContent generated, length:', envContent.length);
     console.log('[ZoomAppCreate] envContent preview:', envContent.substring(0, 200));
+    console.log('[ZoomAppCreate] Proxy OAuth URL:', proxyOAuthUrl);
 
     return json({
       success: true,
       appId: result.app_id,
       appName: trimmedAppName,
-      oauthAuthorizeUrl: result.oauth_authorize_url,
+
+      // Return the proxy URL (with state handling) instead of direct Zoom URL
+      oauthAuthorizeUrl: proxyOAuthUrl,
+
+      // Also include the direct URL for reference
+      directOAuthUrl: result.oauth_authorize_url,
       credentials: {
         clientId: result.credentials.client_id,
         clientSecret: result.credentials.client_secret,

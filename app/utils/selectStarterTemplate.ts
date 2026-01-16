@@ -198,17 +198,70 @@ export async function getTemplates(templateName: string, title?: string) {
     filesToImport.ignoreFile = ignoredFiles;
   }
 
-  let assistantMessage = `
-Bolt is initializing your project with the required files using the ${template.name} template.
-<boltArtifact id="imported-files" title="${title || 'Create initial files'}" type="bundled">
-${filesToImport.files
-  .map(
-    (file) =>
-      `<boltAction type="file" filePath="${file.path}">
+  /*
+   * Execute post-create hook FIRST if template has one (e.g., Zoom App creation)
+   * This allows us to include the .env file in the same artifact as template files
+   */
+  let hookResult: TemplateHookResult | undefined;
+  let envFileAction = '';
+
+  if (template.postCreateHook) {
+    console.log('[getTemplates] Template has post-create hook:', template.postCreateHook.type);
+
+    try {
+      hookResult = await executePostCreateHook(template, title || template.name);
+    } catch (error) {
+      console.error('[getTemplates] Post-create hook error:', error);
+
+      // Non-fatal: return hook error but still provide template files
+      hookResult = {
+        hookType: template.postCreateHook.type,
+        success: false,
+        message: error instanceof Error ? error.message : 'Unknown error executing post-create hook',
+      };
+    }
+
+    // Log hook result for debugging
+    console.log('[getTemplates] Hook result:', {
+      success: hookResult?.success,
+      hasEnvContent: !!hookResult?.envContent,
+      envContentLength: hookResult?.envContent?.length || 0,
+      message: hookResult?.message,
+    });
+
+    // If hook was successful and returned env content, prepare the .env file action
+    if (hookResult?.success && hookResult?.envContent) {
+      console.log('[getTemplates] Will include .env file in the same artifact as template files');
+      envFileAction = `
+<boltAction type="file" filePath=".env">
+${hookResult.envContent}
+</boltAction>`;
+    }
+  }
+
+  // Build the file actions for the artifact
+  const fileActions = filesToImport.files
+    .map(
+      (file) =>
+        `<boltAction type="file" filePath="${file.path}">
 ${file.content}
 </boltAction>`,
-  )
-  .join('\n')}
+    )
+    .join('\n');
+
+  /*
+   * Build assistant message with all files in a SINGLE artifact
+   * Including .env if the hook generated credentials
+   */
+  const hookSuccessNote =
+    hookResult?.success && hookResult?.envContent
+      ? '\nZoom App created successfully! Credentials included in .env file.'
+      : '';
+
+  const assistantMessage = `
+Bolt is initializing your project with the required files using the ${template.name} template.${hookSuccessNote}
+<boltArtifact id="imported-files" title="${title || 'Create initial files'}" type="bundled">
+${fileActions}${envFileAction}
 </boltArtifact>
 `;
   let userMessage = ``;
@@ -263,55 +316,12 @@ Now that the Template is imported please continue with my original request
 IMPORTANT: Dont Forget to install the dependencies before running the app by using \`npm install && npm run dev\`
 `;
 
-  /*
-   * Execute post-create hook if template has one (e.g., Zoom App creation)
-   */
-  let hookResult: TemplateHookResult | undefined;
-
-  if (template.postCreateHook) {
-    console.log('[getTemplates] Template has post-create hook:', template.postCreateHook.type);
-
-    try {
-      hookResult = await executePostCreateHook(template, title || template.name);
-    } catch (error) {
-      console.error('[getTemplates] Post-create hook error:', error);
-
-      // Non-fatal: return hook error but still provide template files
-      hookResult = {
-        hookType: template.postCreateHook.type,
-        success: false,
-        message: error instanceof Error ? error.message : 'Unknown error executing post-create hook',
-      };
-    }
-
-    // Log hook result for debugging
-    console.log('[getTemplates] Hook result:', {
-      success: hookResult?.success,
-      hasEnvContent: !!hookResult?.envContent,
-      envContentLength: hookResult?.envContent?.length || 0,
-      message: hookResult?.message,
-    });
-
-    // If hook was successful and returned env content, append it as a file action
-    if (hookResult?.success && hookResult?.envContent) {
-      console.log('[getTemplates] Appending .env file action to assistant message');
-      assistantMessage += `
-
-Zoom App created successfully! Writing credentials to .env file...
-<boltArtifact id="zoom-credentials" title="Zoom App Credentials" type="bundled">
-<boltAction type="file" filePath=".env">
-${hookResult.envContent}
-</boltAction>
-</boltArtifact>
-`;
-      console.log('[getTemplates] Added .env file with Zoom credentials to assistant message');
-    } else if (hookResult && !hookResult.success) {
-      // Add a note about the hook failure
-      userMessage += `
+  // Add a note about hook failure if it occurred
+  if (hookResult && !hookResult.success) {
+    userMessage += `
 
 NOTE: ${hookResult.message}
 `;
-    }
   }
 
   return {

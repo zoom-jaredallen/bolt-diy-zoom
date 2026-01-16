@@ -470,6 +470,37 @@ export function buildZoomAppCreateRequest(options: {
 }
 
 /**
+ * Generate a proper OAuth authorization URL that goes through the dynamic proxy
+ *
+ * @param credentials - The app credentials
+ * @param appId - The app ID
+ * @param appName - The app name
+ * @param scopes - The scopes to request
+ * @returns A URL that can be used to start the OAuth flow
+ */
+export function generateProxyOAuthUrl(
+  credentials: { client_id: string; client_secret: string },
+  appId: string,
+  appName: string,
+  scopes: string[] = ZOOM_APP_DEFAULTS.default_scopes,
+): string {
+  /*
+   * Build a URL that will go through our dynamic OAuth proxy.
+   * The proxy will create a session with the state parameter.
+   */
+  const params = new URLSearchParams({
+    provider: 'zoom',
+    clientId: credentials.client_id,
+    clientSecret: credentials.client_secret,
+    appId,
+    appName,
+    scopes: scopes.join(','),
+  });
+
+  return `${ZOOM_APP_DEFAULTS.base_url}/api/oauth/proxy/dynamic?${params.toString()}`;
+}
+
+/**
  * Generate .env file content with Zoom App credentials
  *
  * @param response - API response with credentials
@@ -480,6 +511,9 @@ export function generateEnvFileContent(response: ZoomAppCreateResponse, appName:
   console.log('[generateEnvFileContent] Generating .env content for app:', appName);
   console.log('[generateEnvFileContent] App ID:', response.app_id);
   console.log('[generateEnvFileContent] Has credentials:', !!response.credentials);
+
+  // Generate a proper OAuth URL that goes through our proxy
+  const proxyOAuthUrl = generateProxyOAuthUrl(response.credentials, response.app_id, appName);
 
   const content = `# ======================================
 # Zoom App Credentials
@@ -497,8 +531,11 @@ ZOOM_CLIENT_SECRET=${response.credentials.client_secret}
 # OAuth Configuration
 VITE_OAUTH_REDIRECT_URL=${ZOOM_APP_DEFAULTS.oauth_callback_url}
 
-# OAuth Authorization URL
-# Visit this URL to authorize the app:
+# OAuth Authorization URL (use this to authorize the app)
+# This URL goes through our OAuth proxy to properly handle state parameter
+ZOOM_OAUTH_AUTHORIZE_URL=${proxyOAuthUrl}
+
+# Direct Zoom OAuth URL (for reference only - DO NOT use directly)
 # ${response.oauth_authorize_url}
 
 # Zoom Marketplace

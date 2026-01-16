@@ -16,6 +16,7 @@ import {
   getOAuthSessionByState,
   getOAuthProviderConfig,
   exchangeCodeForTokens,
+  exchangeCodeForTokensWithDynamicCredentials,
   storeOAuthTokens,
   deleteOAuthSession,
 } from '~/lib/services/oauth-proxy';
@@ -64,16 +65,29 @@ export async function loader({ request, context }: LoaderFunctionArgs) {
     VITE_PUBLIC_URL: getEnvVar(context, 'VITE_PUBLIC_URL'),
   };
 
-  // Get provider configuration
-  const config = getOAuthProviderConfig(session.provider, env);
-
-  if (!config) {
-    return renderErrorPage('invalid_provider', `Unknown provider: ${session.provider}`);
-  }
+  // Get public URL for redirect
+  const publicUrl = env.VITE_PUBLIC_URL || new URL(request.url).origin;
 
   try {
-    // Exchange code for tokens
-    const tokens = await exchangeCodeForTokens(config, code, session.redirectUri);
+    let tokens;
+
+    // Check if session has dynamic credentials (for newly created apps)
+    if (session.dynamicCredentials) {
+      console.log('[OAuth Callback] Using dynamic credentials for app:', session.dynamicCredentials.appName);
+
+      // Exchange code using dynamic credentials
+      tokens = await exchangeCodeForTokensWithDynamicCredentials(session, code, publicUrl);
+    } else {
+      // Get provider configuration from environment
+      const config = getOAuthProviderConfig(session.provider, env);
+
+      if (!config) {
+        return renderErrorPage('invalid_provider', `Unknown provider: ${session.provider}`);
+      }
+
+      // Exchange code using environment credentials
+      tokens = await exchangeCodeForTokens(config, code, session.redirectUri);
+    }
 
     // Store tokens
     storeOAuthTokens(session.id, tokens);
