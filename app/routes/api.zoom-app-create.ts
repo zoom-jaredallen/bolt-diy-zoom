@@ -127,6 +127,8 @@ export async function action({ request, context }: ActionFunctionArgs) {
     const envContent = generateEnvFileContent(result, trimmedAppName);
 
     console.log('[ZoomAppCreate] Zoom App created successfully:', result.app_id);
+    console.log('[ZoomAppCreate] envContent generated, length:', envContent.length);
+    console.log('[ZoomAppCreate] envContent preview:', envContent.substring(0, 200));
 
     return json({
       success: true,

@@ -4,6 +4,19 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 const PREVIEW_CHANNEL = 'preview-updates';
 
+/**
+ * OWASP Security Headers for Zoom Apps
+ * Required for apps to be loaded in Zoom client iframe
+ * See: https://developers.zoom.us/docs/zoom-apps/security/owasp/
+ */
+const OWASP_HEADERS = {
+  'Strict-Transport-Security': 'max-age=31536000; includeSubDomains',
+  'X-Content-Type-Options': 'nosniff',
+  'Content-Security-Policy': "frame-ancestors 'self' https://*.zoom.us",
+  'Referrer-Policy': 'strict-origin-when-cross-origin',
+  'X-Frame-Options': 'ALLOW-FROM https://*.zoom.us',
+};
+
 export async function loader({ params }: LoaderFunctionArgs) {
   const previewId = params.id;
 
@@ -11,7 +24,7 @@ export async function loader({ params }: LoaderFunctionArgs) {
     throw new Response('Preview ID is required', { status: 400 });
   }
 
-  return json({ previewId });
+  return json({ previewId }, { headers: OWASP_HEADERS });
 }
 
 export default function WebContainerPreview() {

@@ -151,3 +151,50 @@ footer {
   font-size: 0.813rem;
   color: #666;
 }
+
+/* Preview Mode Styles */
+.preview-mode {
+  border: 2px dashed #f59e0b;
+  border-radius: 12px;
+  margin: 8px;
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.05) 0%, rgba(245, 158, 11, 0.02) 100%);
+}
+
+.status.preview {
+  color: #f59e0b;
+  font-weight: 500;
+}
+
+.info-card {
+  background: linear-gradient(135deg, rgba(14, 113, 235, 0.1) 0%, rgba(14, 113, 235, 0.05) 100%);
+  border-left: 3px solid var(--zoom-blue);
+}
+
+.mock-data {
+  border: 1px dashed rgba(0, 0, 0, 0.15);
+  opacity: 0.85;
+}
+
+@media (prefers-color-scheme: dark) {
+  .mock-data {
+    border-color: rgba(255, 255, 255, 0.2);
+  }
+}
+
+.card ol {
+  margin-left: 20px;
+  margin-top: 8px;
+}
+
+.card li {
+  font-size: 0.813rem;
+  margin-bottom: 6px;
+  line-height: 1.4;
+}
+
+footer .hint {
+  margin-top: 8px;
+  font-size: 0.688rem;
+  color: #f59e0b;
+  font-style: italic;
+}

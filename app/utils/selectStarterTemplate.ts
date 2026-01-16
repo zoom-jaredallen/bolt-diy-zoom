@@ -198,7 +198,7 @@ export async function getTemplates(templateName: string, title?: string) {
     filesToImport.ignoreFile = ignoredFiles;
   }
 
-  const assistantMessage = `
+  let assistantMessage = `
 Bolt is initializing your project with the required files using the ${template.name} template.
 <boltArtifact id="imported-files" title="${title || 'Create initial files'}" type="bundled">
 ${filesToImport.files
@@ -263,7 +263,9 @@ Now that the Template is imported please continue with my original request
 IMPORTANT: Dont Forget to install the dependencies before running the app by using \`npm install && npm run dev\`
 `;
 
-  // Execute post-create hook if template has one (e.g., Zoom App creation)
+  /*
+   * Execute post-create hook if template has one (e.g., Zoom App creation)
+   */
   let hookResult: TemplateHookResult | undefined;
 
   if (template.postCreateHook) {
@@ -280,6 +282,35 @@ IMPORTANT: Dont Forget to install the dependencies before running the app by usi
         success: false,
         message: error instanceof Error ? error.message : 'Unknown error executing post-create hook',
       };
+    }
+
+    // Log hook result for debugging
+    console.log('[getTemplates] Hook result:', {
+      success: hookResult?.success,
+      hasEnvContent: !!hookResult?.envContent,
+      envContentLength: hookResult?.envContent?.length || 0,
+      message: hookResult?.message,
+    });
+
+    // If hook was successful and returned env content, append it as a file action
+    if (hookResult?.success && hookResult?.envContent) {
+      console.log('[getTemplates] Appending .env file action to assistant message');
+      assistantMessage += `
+
+Zoom App created successfully! Writing credentials to .env file...
+<boltArtifact id="zoom-credentials" title="Zoom App Credentials" type="bundled">
+<boltAction type="file" filePath=".env">
+${hookResult.envContent}
+</boltAction>
+</boltArtifact>
+`;
+      console.log('[getTemplates] Added .env file with Zoom credentials to assistant message');
+    } else if (hookResult && !hookResult.success) {
+      // Add a note about the hook failure
+      userMessage += `
+
+NOTE: ${hookResult.message}
+`;
     }
   }
 
@@ -360,6 +391,8 @@ async function executeZoomAppCreateHook(projectName: string): Promise<TemplateHo
   >;
 
   console.log('[executeZoomAppCreateHook] API response:', JSON.stringify(result, null, 2));
+  console.log('[executeZoomAppCreateHook] envContent present:', !!result.envContent);
+  console.log('[executeZoomAppCreateHook] envContent length:', result.envContent?.length || 0);
 
   if (!response.ok || !result.success) {
     const errorResult = result;
