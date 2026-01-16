@@ -9,9 +9,9 @@
  * Request body:
  * {
  *   appName: string,           // Required: Name of the Zoom App
- *   scopes?: string[],         // Optional: OAuth scopes (defaults from manifest or preset)
- *   webhookSessionId?: string, // Optional: Webhook proxy session ID
- *   shortDescription?: string, // Optional: Short description (max 50 chars)
+ *   previewId?: string,        // Optional: WebContainer preview ID for home URIs
+ *   scopes?: string[],         // Optional: OAuth scopes
+ *   description?: string,      // Optional: Short description (max 100 chars)
  *   longDescription?: string   // Optional: Long description (max 4000 chars)
  * }
  *
@@ -20,10 +20,8 @@
  *   success: boolean,
  *   appId: string,
  *   appName: string,
- *   credentials: {
- *     development: { clientId, clientSecret },
- *     production: { clientId, clientSecret }
- *   },
+ *   oauthAuthorizeUrl: string,
+ *   credentials: { clientId, clientSecret },
  *   envContent: string  // Pre-formatted .env file content
  * }
  */
@@ -34,6 +32,7 @@ import {
   createZoomAppWithRetry,
   generateEnvFileContent,
   ZoomMarketplaceError,
+  ZOOM_APP_DEFAULTS,
   type ZoomCredentials,
 } from '~/lib/services/zoom-marketplace-api';
 
@@ -65,11 +64,11 @@ export async function action({ request, context }: ActionFunctionArgs) {
 
     console.log('[ZoomAppCreate] Request body:', JSON.stringify(body, null, 2));
 
-    const { appName, scopes, webhookSessionId, shortDescription, longDescription } = body as {
+    const { appName, previewId, scopes, description, longDescription } = body as {
       appName?: string;
+      previewId?: string;
       scopes?: string[];
-      webhookSessionId?: string;
-      shortDescription?: string;
+      description?: string;
       longDescription?: string;
     };
 
@@ -108,41 +107,35 @@ export async function action({ request, context }: ActionFunctionArgs) {
       );
     }
 
+    const trimmedAppName = appName.trim();
+
     // Build the app creation request
     const createRequest = buildZoomAppCreateRequest({
-      appName: appName.trim(),
+      appName: trimmedAppName,
+      previewId,
       scopes,
-      webhookSessionId,
-      shortDescription,
+      description,
       longDescription,
     });
 
-    console.log('[ZoomAppCreate] Creating Zoom App:', appName);
+    console.log('[ZoomAppCreate] Creating Zoom App:', trimmedAppName);
 
     // Create the app with retry logic
     const result = await createZoomAppWithRetry(credentials, createRequest);
 
     // Generate .env file content
-    const envContent = generateEnvFileContent(result);
+    const envContent = generateEnvFileContent(result, trimmedAppName);
 
     console.log('[ZoomAppCreate] Zoom App created successfully:', result.app_id);
 
     return json({
       success: true,
       appId: result.app_id,
-      appName: result.app_name,
-      appType: result.app_type,
-      createdAt: result.created_at,
-      scopes: result.scopes,
+      appName: trimmedAppName,
+      oauthAuthorizeUrl: result.oauth_authorize_url,
       credentials: {
-        development: {
-          clientId: result.development_credentials.client_id,
-          clientSecret: result.development_credentials.client_secret,
-        },
-        production: {
-          clientId: result.production_credentials.client_id,
-          clientSecret: result.production_credentials.client_secret,
-        },
+        clientId: result.credentials.client_id,
+        clientSecret: result.credentials.client_secret,
       },
       envContent,
     });
@@ -198,14 +191,14 @@ export async function loader({ context }: ActionFunctionArgs) {
     },
     requestSchema: {
       appName: { type: 'string', required: true, description: 'Name of the Zoom App' },
+      previewId: { type: 'string', required: false, description: 'WebContainer preview ID for home URIs' },
       scopes: {
         type: 'string[]',
         required: false,
         description: 'OAuth scopes',
-        default: ['meeting:read', 'meeting:write', 'user:read'],
+        default: ZOOM_APP_DEFAULTS.default_scopes,
       },
-      webhookSessionId: { type: 'string', required: false, description: 'Webhook proxy session ID' },
-      shortDescription: { type: 'string', required: false, description: 'Short description (max 50 chars)' },
+      description: { type: 'string', required: false, description: 'Short description (max 100 chars)' },
       longDescription: { type: 'string', required: false, description: 'Long description (max 4000 chars)' },
     },
   });

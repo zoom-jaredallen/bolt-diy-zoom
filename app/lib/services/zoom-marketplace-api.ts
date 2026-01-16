@@ -30,87 +30,86 @@ interface ZoomAccessTokenResponse {
 }
 
 /**
- * Zoom App creation request body
+ * Scope object for oauth_information.scopes
  */
-export interface ZoomAppCreateRequest {
-  app_type: 'general' | 's2s_oauth' | 'chatbot' | 'team_chat';
-  contact_name: string;
-  contact_email: string;
-  company_name: string;
-  active: boolean;
-  manifest?: ZoomAppManifest;
+interface ZoomScopeObject {
+  scope: string;
+  optional: boolean;
 }
 
 /**
- * Zoom App manifest structure (new unified build flow)
+ * Zoom App creation request body (correct schema as of 2024+)
+ */
+export interface ZoomAppCreateRequest {
+  app_name: string;
+  app_type: 'general' | 's2s_oauth' | 'chatbot' | 'team_chat';
+  company_name: string;
+  contact_email: string;
+  contact_name: string;
+  scopes: string[];
+  active: boolean;
+  publish: boolean;
+  manifest: ZoomAppManifest;
+}
+
+/**
+ * Zoom App manifest structure
  */
 export interface ZoomAppManifest {
   display_information: {
-    name: string;
-    short_description?: string;
-    long_description?: string;
-    support_url?: string;
-    privacy_policy_url?: string;
-    terms_of_use_url?: string;
+    display_name: string;
+    description: string;
+    long_description: string;
   };
-  oauth_information?: {
-    redirect_uri?: string;
-    scopes?: string[];
+  oauth_information: {
+    usage: 'USER_OPERATION' | 'ADMIN_OPERATION';
+    development_redirect_uri: string;
+    production_redirect_uri: string;
+    oauth_allow_list: string[];
+    strict_mode: boolean;
+    subdomain_strict_mode: boolean;
+    scopes: ZoomScopeObject[];
+    scope_description: string;
   };
-  features?: {
-    products?: ZoomProduct[];
-    development_home_uri?: string;
-    production_home_uri?: string;
-    domain_allow_list?: string[];
-    in_client_feature?: {
-      collaborate?: boolean;
-      main_panel?: boolean;
-      camera?: boolean;
-      custom_background?: boolean;
-    };
-    zoom_client_support?: {
-      windows?: boolean;
-      mac?: boolean;
-      linux?: boolean;
-      ios?: boolean;
-      android?: boolean;
-    };
-    embed?: {
-      enabled?: boolean;
-      meeting?: boolean;
-      webinar?: boolean;
-    };
-    team_chat_subscription?: {
-      enabled?: boolean;
-      event_types?: string[];
-    };
-    event_subscription?: {
-      enabled?: boolean;
-      endpoint_url?: string;
-      event_types?: string[];
+  features: {
+    products: ZoomProduct[];
+    development_home_uri: string;
+    production_home_uri: string;
+    in_client_feature: {
+      zoom_app_api: {
+        enable: boolean;
+        zoom_app_apis: string[];
+      };
+      guest_mode: {
+        enable: boolean;
+        enable_test_guest_mode: boolean;
+      };
+      in_client_oauth: {
+        enable: boolean;
+      };
+      collaborate_mode: {
+        enable: boolean;
+        enable_screen_sharing: boolean;
+        enable_play_together: boolean;
+        enable_start_immediately: boolean;
+        enable_join_immediately: boolean;
+      };
     };
   };
 }
 
 /**
- * Zoom product type
+ * Zoom product type (uppercase format)
  */
-type ZoomProduct = 'meetings' | 'webinars' | 'team_chat' | 'zoom_rooms' | 'contact_center';
+type ZoomProduct = 'ZOOM_MEETING' | 'ZOOM_PHONE' | 'ZOOM_CONTACT_CENTER' | 'ZOOM_WEBINAR' | 'ZOOM_TEAM_CHAT';
 
 /**
  * Zoom App creation response
  */
 export interface ZoomAppCreateResponse {
-  created_at: string;
   app_id: string;
-  app_name: string;
-  app_type: string;
-  scopes: string[];
-  production_credentials: {
-    client_id: string;
-    client_secret: string;
-  };
-  development_credentials: {
+  oauth_authorize_url: string;
+  credentials: {
     client_id: string;
     client_secret: string;
   };
@@ -143,24 +142,31 @@ let tokenCache: TokenCache | null = null;
 
 /**
  * Default values for Zoom App creation
- *
- * Note: For General Apps (in-client Zoom Apps), the required scopes are different
- * from Meeting/Webinar API scopes. The zoomapp:inmeeting scope is required for
- * apps that run inside the Zoom client.
  */
 export const ZOOM_APP_DEFAULTS = {
   contact_name: 'Jared Allen',
   contact_email: 'jared.allen@zoom.us',
   company_name: 'Zoom',
-  domain_allow_list: ['zoomvibes.j4red4llen.com'],
+  base_url: 'https://zoomvibes.j4red4llen.com',
   oauth_callback_url: 'https://zoomvibes.j4red4llen.com/api/oauth/proxy/callback',
-  webhook_proxy_base: 'https://zoomvibes.j4red4llen.com/api/webhook/proxy',
+  webcontainer_preview_base: 'https://zoomvibes.j4red4llen.com/webcontainer/preview',
 
   /*
-   * Scopes for General Apps (in-client Zoom Apps)
-   * zoomapp:inmeeting - Required for in-client features (main_panel, collaborate)
+   * Default scopes for General Apps (in-client Zoom Apps)
+   * - meeting:read:meeting - Read meeting information
+   * - zoomapp:inmeeting - Required for in-client features
    */
-  default_scopes: ['zoomapp:inmeeting'],
+  default_scopes: ['meeting:read:meeting', 'zoomapp:inmeeting'],
+
+  /*
+   * Default Zoom App APIs to enable
+   */
+  default_zoom_app_apis: ['getPhoneContext', 'getRunningContext', 'getSupportedJsApis', 'openUrl'],
+
+  /*
+   * Default products to enable
+   */
+  default_products: ['ZOOM_MEETING', 'ZOOM_PHONE', 'ZOOM_CONTACT_CENTER'] as ZoomProduct[],
 };
 
 /**
@@ -253,7 +259,8 @@ export async function createZoomApp(
 ): Promise<ZoomAppCreateResponse> {
   const accessToken = await getZoomAccessToken(credentials);
 
-  console.log('[ZoomAPI] Creating Zoom App:', request.manifest?.display_information?.name);
+  console.log('[ZoomAPI] Creating Zoom App:', request.app_name);
+  console.log('[ZoomAPI] Request body:', JSON.stringify(request, null, 2));
 
   try {
     const response = await fetch('https://api.zoom.us/v2/marketplace/apps', {
@@ -288,6 +295,7 @@ export async function createZoomApp(
 
     const data = (await response.json()) as ZoomAppCreateResponse;
     console.log('[ZoomAPI] Zoom App created successfully:', data.app_id);
+    console.log('[ZoomAPI] OAuth Authorize URL:', data.oauth_authorize_url);
 
     return data;
   } catch (error) {
@@ -359,67 +367,73 @@ export async function createZoomAppWithRetry(
  */
 export function buildZoomAppManifest(options: {
   appName: string;
-  shortDescription?: string;
+  description?: string;
   longDescription?: string;
   scopes?: string[];
-  webhookSessionId?: string;
-  productionHomeUri?: string;
-  supportUrl?: string;
-  privacyPolicyUrl?: string;
-  termsOfUseUrl?: string;
+  previewId?: string;
+  products?: ZoomProduct[];
+  zoomAppApis?: string[];
 }): ZoomAppManifest {
   const {
     appName,
-    shortDescription = 'Built with Bolt.diy',
+    description = `${appName} - Built with Bolt.diy`,
     longDescription = 'A Zoom App created using Bolt.diy - the AI-powered web development environment.',
     scopes = ZOOM_APP_DEFAULTS.default_scopes,
-    webhookSessionId,
-    productionHomeUri = '',
-    supportUrl,
-    privacyPolicyUrl,
-    termsOfUseUrl,
+    previewId,
+    products = ZOOM_APP_DEFAULTS.default_products,
+    zoomAppApis = ZOOM_APP_DEFAULTS.default_zoom_app_apis,
   } = options;
 
-  // Development home URI uses webhook proxy for local testing
-  const developmentHomeUri = webhookSessionId
-    ? `${ZOOM_APP_DEFAULTS.webhook_proxy_base}/${webhookSessionId}`
-    : ZOOM_APP_DEFAULTS.webhook_proxy_base;
+  // Build home URI using the WebContainer preview URL if previewId provided
+  const homeUri = previewId
+    ? `${ZOOM_APP_DEFAULTS.webcontainer_preview_base}/${previewId}`
+    : ZOOM_APP_DEFAULTS.webcontainer_preview_base;
+
+  // Convert string scopes to scope objects
+  const scopeObjects: ZoomScopeObject[] = scopes.map((scope) => ({
+    scope,
+    optional: false,
+  }));
 
   return {
     display_information: {
-      name: appName,
-      short_description: shortDescription.slice(0, 50), // 50 char limit
+      display_name: appName,
+      description: description.slice(0, 100), // 100 char limit for description
       long_description: longDescription.slice(0, 4000), // 4000 char limit
-      ...(supportUrl && { support_url: supportUrl }),
-      ...(privacyPolicyUrl && { privacy_policy_url: privacyPolicyUrl }),
-      ...(termsOfUseUrl && { terms_of_use_url: termsOfUseUrl }),
     },
     oauth_information: {
-      redirect_uri: ZOOM_APP_DEFAULTS.oauth_callback_url,
-      scopes,
+      usage: 'USER_OPERATION',
+      development_redirect_uri: ZOOM_APP_DEFAULTS.oauth_callback_url,
+      production_redirect_uri: ZOOM_APP_DEFAULTS.oauth_callback_url,
+      oauth_allow_list: [ZOOM_APP_DEFAULTS.base_url],
+      strict_mode: false,
+      subdomain_strict_mode: true,
+      scopes: scopeObjects,
+      scope_description: `Scopes for ${appName}`,
     },
     features: {
-      products: ['meetings'],
-      development_home_uri: developmentHomeUri,
-      production_home_uri: productionHomeUri,
-      domain_allow_list: [...ZOOM_APP_DEFAULTS.domain_allow_list],
+      products,
+      development_home_uri: homeUri,
+      production_home_uri: homeUri,
       in_client_feature: {
-        collaborate: true,
-        main_panel: true,
-        camera: false,
-        custom_background: false,
-      },
-      zoom_client_support: {
-        windows: true,
-        mac: true,
-        linux: true,
-        ios: false,
-        android: false,
-      },
-      embed: {
-        enabled: false,
-        meeting: false,
-        webinar: false,
+        zoom_app_api: {
+          enable: true,
+          zoom_app_apis: zoomAppApis,
+        },
+        guest_mode: {
+          enable: false,
+          enable_test_guest_mode: false,
+        },
+        in_client_oauth: {
+          enable: false,
+        },
+        collaborate_mode: {
+          enable: false,
+          enable_screen_sharing: false,
+          enable_play_together: false,
+          enable_start_immediately: false,
+          enable_join_immediately: false,
+        },
       },
     },
   };
@@ -428,51 +442,58 @@ export function buildZoomAppManifest(options: {
 /**
  * Build complete app creation request
  *
- * @param manifestOptions - Options for manifest generation
+ * @param options - Options for request generation
  * @returns Complete request body for Marketplace API
  */
-export function buildZoomAppCreateRequest(
-  manifestOptions: Parameters<typeof buildZoomAppManifest>[0],
-): ZoomAppCreateRequest {
+export function buildZoomAppCreateRequest(options: {
+  appName: string;
+  description?: string;
+  longDescription?: string;
+  scopes?: string[];
+  previewId?: string;
+  products?: ZoomProduct[];
+  zoomAppApis?: string[];
+}): ZoomAppCreateRequest {
+  const scopes = options.scopes || ZOOM_APP_DEFAULTS.default_scopes;
+
   return {
+    app_name: options.appName,
     app_type: 'general',
-    contact_name: ZOOM_APP_DEFAULTS.contact_name,
-    contact_email: ZOOM_APP_DEFAULTS.contact_email,
     company_name: ZOOM_APP_DEFAULTS.company_name,
-    active: true,
-    manifest: buildZoomAppManifest(manifestOptions),
+    contact_email: ZOOM_APP_DEFAULTS.contact_email,
+    contact_name: ZOOM_APP_DEFAULTS.contact_name,
+    scopes, // Top-level scopes as string array
+    active: false,
+    publish: false,
+    manifest: buildZoomAppManifest(options),
   };
 }
 
 /**
  * Generate .env file content with Zoom App credentials
  *
- * @param credentials - Development and production credentials from API response
- * @param appId - The created app ID
+ * @param response - API response with credentials
+ * @param appName - Name of the created app
  * @returns String content for .env file
  */
-export function generateEnvFileContent(credentials: ZoomAppCreateResponse): string {
+export function generateEnvFileContent(response: ZoomAppCreateResponse, appName: string): string {
   return `# ======================================
 # Zoom App Credentials
 # Auto-generated by Bolt.diy on ${new Date().toISOString()}
 # ======================================
 
-# App ID: ${credentials.app_id}
-# App Name: ${credentials.app_name}
-# Created: ${credentials.created_at}
+# App ID: ${response.app_id}
+# App Name: ${appName}
 
-# Development Credentials (use for local testing)
-VITE_ZOOM_CLIENT_ID=${credentials.development_credentials.client_id}
-ZOOM_CLIENT_SECRET=${credentials.development_credentials.client_secret}
+# Zoom App Credentials
+VITE_ZOOM_CLIENT_ID=${response.credentials.client_id}
+ZOOM_CLIENT_SECRET=${response.credentials.client_secret}
 
-# OAuth redirect URL (bolt.diy proxy for development)
+# OAuth Configuration
 VITE_OAUTH_REDIRECT_URL=${ZOOM_APP_DEFAULTS.oauth_callback_url}
 
-# Production Credentials (uncomment when deploying to Vercel/Netlify/etc.)
-# VITE_ZOOM_PROD_CLIENT_ID=${credentials.production_credentials.client_id}
-# ZOOM_PROD_CLIENT_SECRET=${credentials.production_credentials.client_secret}
-
-# Scopes: ${credentials.scopes.join(', ')}
+# OAuth Authorization URL (use this to authorize the app)
+# ${response.oauth_authorize_url}
 `;
 }
 

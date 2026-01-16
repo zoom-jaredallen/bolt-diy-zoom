@@ -349,7 +349,7 @@ async function executeZoomAppCreateHook(projectName: string): Promise<TemplateHo
     },
     body: JSON.stringify({
       appName: projectName,
-      shortDescription: `${projectName} - Zoom App`,
+      description: `${projectName} - Zoom App`,
     }),
   });
 

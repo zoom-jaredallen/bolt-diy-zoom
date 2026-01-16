@@ -12,13 +12,8 @@ export interface ZoomAppCreateResult {
   success: boolean;
   appId: string;
   appName: string;
-  appType: string;
-  createdAt: string;
-  scopes: string[];
-  credentials: {
-    development: ZoomAppCredentials;
-    production: ZoomAppCredentials;
-  };
+  oauthAuthorizeUrl: string;
+  credentials: ZoomAppCredentials;
   envContent: string;
 }
 
@@ -56,9 +51,9 @@ export type ZoomAppErrorCode =
  */
 export interface ZoomAppCreateRequest {
   appName: string;
+  previewId?: string;
   scopes?: string[];
-  webhookSessionId?: string;
-  shortDescription?: string;
+  description?: string;
   longDescription?: string;
 }
 
@@ -92,40 +87,41 @@ export interface ZoomTemplateHookOptions {
 export interface ZoomTemplateHookResult {
   success: boolean;
   appId?: string;
-  credentials?: {
-    development: ZoomAppCredentials;
-    production: ZoomAppCredentials;
-  };
+  credentials?: ZoomAppCredentials;
   envFileWritten?: boolean;
   error?: string;
 }
 
 /**
  * Zoom OAuth scopes commonly used in Zoom Apps
+ *
+ * Note: For General Apps (in-client Zoom Apps), use the new scope format
+ * with product prefix (e.g., meeting:read:meeting instead of meeting:read)
  */
 export const ZOOM_OAUTH_SCOPES = {
-  // Meeting scopes
-  MEETING_READ: 'meeting:read',
-  MEETING_WRITE: 'meeting:write',
+  // In-meeting scope (required for General Apps)
+  ZOOMAPP_INMEETING: 'zoomapp:inmeeting',
 
-  // User scopes
-  USER_READ: 'user:read',
-  USER_WRITE: 'user:write',
-  USER_PROFILE_READ: 'user:read:profile',
+  // Meeting scopes (new format)
+  MEETING_READ_MEETING: 'meeting:read:meeting',
+  MEETING_WRITE_MEETING: 'meeting:write:meeting',
+  MEETING_READ_LIST_MEETINGS: 'meeting:read:list_meetings',
+
+  // User scopes (new format)
+  USER_READ_USER: 'user:read:user',
+  USER_READ_EMAIL: 'user:read:email',
 
   // Recording scopes
-  RECORDING_READ: 'recording:read',
-  RECORDING_WRITE: 'recording:write',
+  RECORDING_READ: 'recording:read:recording',
+  RECORDING_WRITE: 'recording:write:recording',
 
   // Webinar scopes
-  WEBINAR_READ: 'webinar:read',
-  WEBINAR_WRITE: 'webinar:write',
+  WEBINAR_READ: 'webinar:read:webinar',
+  WEBINAR_WRITE: 'webinar:write:webinar',
 
   // Chat scopes
   CHAT_MESSAGE_READ: 'chat_message:read',
   CHAT_MESSAGE_WRITE: 'chat_message:write',
-  CHAT_CHANNEL_READ: 'chat_channel:read',
-  CHAT_CHANNEL_WRITE: 'chat_channel:write',
 
   // Team chat scopes
   TEAM_CHAT_READ: 'team_chat:read',
@@ -133,18 +129,20 @@ export const ZOOM_OAUTH_SCOPES = {
 } as const;
 
 /**
- * Default scopes for a basic Zoom App
+ * Default scopes for a General (in-client) Zoom App
  */
-export const DEFAULT_ZOOM_APP_SCOPES = [
-  ZOOM_OAUTH_SCOPES.MEETING_READ,
-  ZOOM_OAUTH_SCOPES.MEETING_WRITE,
-  ZOOM_OAUTH_SCOPES.USER_READ,
-];
+export const DEFAULT_ZOOM_APP_SCOPES = [ZOOM_OAUTH_SCOPES.MEETING_READ_MEETING, ZOOM_OAUTH_SCOPES.ZOOMAPP_INMEETING];
 
 /**
- * Zoom App products
+ * Zoom App products (uppercase format for API)
  */
-export type ZoomProduct = 'meetings' | 'webinars' | 'team_chat' | 'zoom_rooms' | 'contact_center';
+export type ZoomProduct =
+  | 'ZOOM_MEETING'
+  | 'ZOOM_PHONE'
+  | 'ZOOM_CONTACT_CENTER'
+  | 'ZOOM_WEBINAR'
+  | 'ZOOM_TEAM_CHAT'
+  | 'ZOOM_ROOMS';
 
 /**
  * Zoom App types
