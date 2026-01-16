@@ -95,6 +95,7 @@ export function getZoomAppRegistration(appId: string): ZoomAppRegistration | nul
   if (Date.now() - registration.lastAccessAt > REGISTRATION_TTL) {
     appRegistry.delete(appId);
     console.log(`[ZoomAppRegistry] Expired registration removed: ${appId}`);
+
     return null;
   }
 
@@ -113,6 +114,7 @@ export function findZoomAppByClientId(clientId: string): ZoomAppRegistration | n
       // Check expiration
       if (Date.now() - registration.lastAccessAt > REGISTRATION_TTL) {
         appRegistry.delete(registration.appId);
+
         continue;
       }
 
