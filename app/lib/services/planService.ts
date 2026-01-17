@@ -96,10 +96,12 @@ export function parsePlanFromText(text: string, chatId: string): Plan | null {
           createdAt: Date.now(),
           status: 'draft',
           currentStepIndex: 0,
-          totalEstimatedTokens: planData.estimatedTotalTokens || steps.reduce((sum, s) => sum + (s.estimatedTokens || 0), 0),
+          totalEstimatedTokens:
+            planData.estimatedTotalTokens || steps.reduce((sum, s) => sum + (s.estimatedTokens || 0), 0),
         };
 
         logger.debug('Parsed plan from JSON:', plan.title);
+
         return plan;
       }
     }
@@ -214,10 +216,12 @@ function parseMarkdownPlan(text: string, chatId: string): Plan | null {
     };
 
     logger.debug('Parsed plan from markdown:', plan.title, `(${steps.length} steps)`);
+
     return plan;
   }
 
   logger.warn('Could not parse plan from text');
+
   return null;
 }
 

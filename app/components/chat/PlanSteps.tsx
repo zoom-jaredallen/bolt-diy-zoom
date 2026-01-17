@@ -86,9 +86,7 @@ export function PlanSteps({ onExecute, className }: PlanStepsProps) {
           </div>
         </div>
 
-        {currentPlan.summary && (
-          <p className="mt-1 text-sm text-bolt-elements-textSecondary">{currentPlan.summary}</p>
-        )}
+        {currentPlan.summary && <p className="mt-1 text-sm text-bolt-elements-textSecondary">{currentPlan.summary}</p>}
 
         {/* Progress bar */}
         {(isExecuting || isCompleted) && (
@@ -132,9 +130,7 @@ export function PlanSteps({ onExecute, className }: PlanStepsProps) {
       {isDraft && mode === 'plan' && (
         <div className="px-4 py-3 border-t border-bolt-elements-borderColor bg-bolt-elements-background-depth-3">
           <div className="flex items-center justify-between">
-            <p className="text-sm text-bolt-elements-textSecondary">
-              Review this plan and approve to begin execution
-            </p>
+            <p className="text-sm text-bolt-elements-textSecondary">Review this plan and approve to begin execution</p>
             <div className="flex items-center gap-2">
               <button
                 type="button"
@@ -264,9 +260,7 @@ function StepItem({ step, index, isActive, canSkip, onSkip }: StepItemProps) {
                 </ul>
               )}
 
-              {step.error && (
-                <div className="mt-2 p-2 bg-red-500/10 rounded text-sm text-red-400">{step.error}</div>
-              )}
+              {step.error && <div className="mt-2 p-2 bg-red-500/10 rounded text-sm text-red-400">{step.error}</div>}
 
               {step.actualTokens && (
                 <p className="mt-2 text-xs text-bolt-elements-textSecondary">

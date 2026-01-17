@@ -117,14 +117,15 @@ function ActIcon({ className }: { className?: string }) {
 }
 
 function StatusDot({ status }: { status: string }) {
-  const colorClass = {
-    draft: 'bg-yellow-500',
-    approved: 'bg-blue-500',
-    executing: 'bg-blue-500 animate-pulse',
-    completed: 'bg-green-500',
-    failed: 'bg-red-500',
-    cancelled: 'bg-gray-500',
-  }[status] || 'bg-gray-500';
+  const colorClass =
+    {
+      draft: 'bg-yellow-500',
+      approved: 'bg-blue-500',
+      executing: 'bg-blue-500 animate-pulse',
+      completed: 'bg-green-500',
+      failed: 'bg-red-500',
+      cancelled: 'bg-gray-500',
+    }[status] || 'bg-gray-500';
 
   return <span className={classNames('w-2 h-2 rounded-full', colorClass)} />;
 }

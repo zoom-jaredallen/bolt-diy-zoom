@@ -50,27 +50,38 @@ async function chatAction({ context, request }: ActionFunctionArgs) {
     },
   });
 
-  const { messages, files, promptId, contextOptimization, supabase, chatMode, designScheme, maxLLMSteps, planMode, currentPlan, currentStepIndex } =
-    await request.json<{
-      messages: Messages;
-      files: any;
-      promptId?: string;
-      contextOptimization: boolean;
-      chatMode: 'discuss' | 'build';
-      designScheme?: DesignScheme;
-      supabase?: {
-        isConnected: boolean;
-        hasSelectedProject: boolean;
-        credentials?: {
-          anonKey?: string;
-          supabaseUrl?: string;
-        };
+  const {
+    messages,
+    files,
+    promptId,
+    contextOptimization,
+    supabase,
+    chatMode,
+    designScheme,
+    maxLLMSteps,
+    planMode,
+    currentPlan,
+    currentStepIndex,
+  } = await request.json<{
+    messages: Messages;
+    files: any;
+    promptId?: string;
+    contextOptimization: boolean;
+    chatMode: 'discuss' | 'build';
+    designScheme?: DesignScheme;
+    supabase?: {
+      isConnected: boolean;
+      hasSelectedProject: boolean;
+      credentials?: {
+        anonKey?: string;
+        supabaseUrl?: string;
       };
-      maxLLMSteps: number;
-      planMode?: PlanMode;
-      currentPlan?: Plan;
-      currentStepIndex?: number;
-    }>();
+    };
+    maxLLMSteps: number;
+    planMode?: PlanMode;
+    currentPlan?: Plan;
+    currentStepIndex?: number;
+  }>();
 
   // Log plan mode status and prepare plan context
   let planContext = '';
@@ -80,6 +91,7 @@ async function chatAction({ context, request }: ActionFunctionArgs) {
     planContext = PLAN_MODE_SYSTEM_PROMPT;
   } else if (planMode === 'act' && currentPlan) {
     logger.debug(`Running in ACT mode - executing step ${(currentStepIndex ?? 0) + 1} of ${currentPlan.steps.length}`);
+
     const step = currentPlan.steps[currentStepIndex ?? 0];
 
     if (step) {
