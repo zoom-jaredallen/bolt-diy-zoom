@@ -10,6 +10,8 @@ import { createScopedLogger } from '~/utils/logger';
 import { createFilesContext, extractPropertiesFromMessage } from './utils';
 import { discussPrompt } from '~/lib/common/prompts/discuss-prompt';
 import type { DesignScheme } from '~/types/design-scheme';
+import type { PlanMode, Plan } from '~/types/plan';
+import { PLAN_MODE_SYSTEM_PROMPT } from '~/lib/common/prompts/plan-prompt';
 
 export type Messages = Message[];
 
@@ -65,6 +67,9 @@ export async function streamText(props: {
   messageSliceId?: number;
   chatMode?: 'discuss' | 'build';
   designScheme?: DesignScheme;
+  planMode?: PlanMode;
+  currentPlan?: Plan;
+  currentStepIndex?: number;
 }) {
   const {
     messages,
@@ -273,6 +278,31 @@ export async function streamText(props: {
     ),
   );
 
+  // Handle Plan Mode - override system prompt to prevent code generation
+  let effectiveSystemPrompt = chatMode === 'build' ? systemPrompt : discussPrompt();
+
+  if (props.planMode === 'plan') {
+    logger.info('PLAN MODE ACTIVE - Using plan-only system prompt');
+    effectiveSystemPrompt = PLAN_MODE_SYSTEM_PROMPT;
+  } else if (props.planMode === 'act' && props.currentPlan) {
+    // In Act mode with an active plan, add step context
+    const stepIndex = props.currentStepIndex ?? 0;
+    const step = props.currentPlan.steps[stepIndex];
+
+    if (step) {
+      logger.info(`ACT MODE - Executing step ${stepIndex + 1}: ${step.title}`);
+      effectiveSystemPrompt = `${effectiveSystemPrompt}
+
+[PLAN EXECUTION MODE]
+You are executing step ${stepIndex + 1} of ${props.currentPlan.steps.length}: "${step.title}"
+
+Step description: ${step.description}
+
+Focus on completing this step thoroughly. Use <boltArtifact> tags to create/modify files as needed.
+`;
+    }
+  }
+
   const streamParams = {
     model: provider.getModelInstance({
       model: modelDetails.name,
@@ -280,7 +310,7 @@ export async function streamText(props: {
       apiKeys,
       providerSettings,
     }),
-    system: chatMode === 'build' ? systemPrompt : discussPrompt(),
+    system: effectiveSystemPrompt,
     ...tokenParams,
     messages: convertToCoreMessages(processedMessages as any),
     ...filteredOptions,

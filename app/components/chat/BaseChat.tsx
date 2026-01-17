@@ -430,26 +430,24 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
                 </div>
                 {progressAnnotations && <ProgressCompilation data={progressAnnotations} />}
 
-                {/* Plan Mode Controls */}
-                {chatStarted && (
-                  <div className="flex flex-col gap-3">
-                    <PlanModeToggle disabled={isStreaming} />
-                    {planState.currentPlan && (
-                      <PlanSteps
-                        onExecute={() => {
-                          // When plan is approved, trigger execution
-                          if (sendMessage) {
-                            const firstStep = planState.currentPlan?.steps[0];
+                {/* Plan Mode Controls - Available before and after chat starts */}
+                <div className="flex flex-col gap-3">
+                  <PlanModeToggle disabled={isStreaming} />
+                  {chatStarted && planState.currentPlan && (
+                    <PlanSteps
+                      onExecute={() => {
+                        // When plan is approved, trigger execution
+                        if (sendMessage) {
+                          const firstStep = planState.currentPlan?.steps[0];
 
-                            if (firstStep) {
-                              sendMessage({} as any, `Execute step 1: ${firstStep.title}`);
-                            }
+                          if (firstStep) {
+                            sendMessage({} as any, `Execute step 1: ${firstStep.title}`);
                           }
-                        }}
-                      />
-                    )}
-                  </div>
-                )}
+                        }
+                      }}
+                    />
+                  )}
+                </div>
 
                 <ChatBox
                   isModelSettingsCollapsed={isModelSettingsCollapsed}

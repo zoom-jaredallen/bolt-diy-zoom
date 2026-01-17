@@ -317,6 +317,9 @@ async function chatAction({ context, request }: ActionFunctionArgs) {
               designScheme,
               summary,
               messageSliceId,
+              planMode,
+              currentPlan,
+              currentStepIndex,
             });
 
             result.mergeIntoDataStream(dataStream);
@@ -358,6 +361,9 @@ async function chatAction({ context, request }: ActionFunctionArgs) {
           designScheme,
           summary,
           messageSliceId,
+          planMode,
+          currentPlan,
+          currentStepIndex,
         });
 
         (async () => {

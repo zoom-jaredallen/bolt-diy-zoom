@@ -8,9 +8,9 @@ import { generateId } from 'ai';
  * Manages the Plan → Act mode loop state for multi-step execution.
  */
 
-// Core plan state
+// Core plan state - Default to 'plan' mode for thoughtful task execution
 export const planStore = map<PlanState>({
-  mode: 'act',
+  mode: 'plan',
   currentPlan: null,
   isGeneratingPlan: false,
   isPlanApproved: false,

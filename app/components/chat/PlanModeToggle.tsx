@@ -23,10 +23,13 @@ export function PlanModeToggle({ disabled = false, className }: PlanModeTogglePr
 
   return (
     <div className={classNames('flex items-center gap-2', className)}>
-      <div className="relative flex items-center bg-bolt-elements-background-depth-2 rounded-lg p-1 border border-bolt-elements-borderColor">
+      <div className="relative flex items-center bg-gray-800/80 rounded-lg p-1 border border-gray-600 shadow-lg">
         {/* Sliding background indicator */}
         <motion.div
-          className="absolute top-1 bottom-1 rounded-md bg-bolt-elements-button-primary-background"
+          className={classNames(
+            'absolute top-1 bottom-1 rounded-md shadow-md',
+            isPlanMode ? 'bg-blue-600' : 'bg-green-600',
+          )}
           layout
           initial={false}
           animate={{
@@ -42,11 +45,9 @@ export function PlanModeToggle({ disabled = false, className }: PlanModeTogglePr
           disabled={disabled || isGeneratingPlan}
           onClick={() => handleModeChange('plan')}
           className={classNames(
-            'relative z-10 px-3 py-1.5 text-sm font-medium rounded-md transition-colors',
-            'flex items-center gap-1.5',
-            isPlanMode
-              ? 'text-bolt-elements-textPrimary'
-              : 'text-bolt-elements-textSecondary hover:text-bolt-elements-textPrimary',
+            'relative z-10 px-4 py-2 text-sm font-semibold rounded-md transition-all duration-200',
+            'flex items-center gap-2',
+            isPlanMode ? 'text-white' : 'text-gray-300 hover:text-white',
             (disabled || isGeneratingPlan) && 'opacity-50 cursor-not-allowed',
           )}
         >
@@ -60,11 +61,9 @@ export function PlanModeToggle({ disabled = false, className }: PlanModeTogglePr
           disabled={disabled}
           onClick={() => handleModeChange('act')}
           className={classNames(
-            'relative z-10 px-3 py-1.5 text-sm font-medium rounded-md transition-colors',
-            'flex items-center gap-1.5',
-            isActMode
-              ? 'text-bolt-elements-textPrimary'
-              : 'text-bolt-elements-textSecondary hover:text-bolt-elements-textPrimary',
+            'relative z-10 px-4 py-2 text-sm font-semibold rounded-md transition-all duration-200',
+            'flex items-center gap-2',
+            isActMode ? 'text-white' : 'text-gray-300 hover:text-white',
             disabled && 'opacity-50 cursor-not-allowed',
           )}
         >
