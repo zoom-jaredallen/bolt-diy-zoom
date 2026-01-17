@@ -1,14 +1,14 @@
 {
-  "name": "bolt",
-  "description": "An AI Agent",
+  "name": "Zoom App Builder",
+  "description": "An AI Powered App Builder for Zoom Apps built on top of Bolt.diy",
   "private": true,
   "license": "MIT",
   "sideEffects": false,
   "type": "module",
   "version": "1.0.7",
   "author": {
-    "name": "bolt.diy team",
-    "email": "maintainers@bolt.diy"
+    "name": "Jared ALlen",
+    "email": "jared.allen@zoom.us"
   },
   "scripts": {
     "deploy": "npm run build && wrangler pages deploy",

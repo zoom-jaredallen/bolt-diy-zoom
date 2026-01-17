@@ -86,7 +86,7 @@ export function ZoomApp() {
         </main>
 
         <footer>
-          <p>Built with bolt.diy + @zoom/appssdk</p>
+          <p>Built with Zoom App Builder</p>
           <p className="hint">Open in Zoom Desktop Client for full functionality</p>
         </footer>
       </div>
@@ -149,7 +149,7 @@ export function ZoomApp() {
       </main>
 
       <footer>
-        <p>Built with bolt.diy + @zoom/appssdk</p>
+        <p>Built with Zoom App Builder</p>
       </footer>
     </div>
   );

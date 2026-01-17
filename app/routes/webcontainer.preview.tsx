@@ -100,7 +100,7 @@ export default function WebContainerPreviewBase() {
         </div>
 
         <div className="mt-8 text-xs text-slate-500">
-          <p>Built with Bolt.diy</p>
+          <p>Built with Zoom App Builder</p>
         </div>
       </div>
     </div>

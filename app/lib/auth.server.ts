@@ -24,6 +24,7 @@ const PUBLIC_PATHS = [
   '/icons/',
   '/logo',
   '/apple-touch-icon',
+  '/webcontainer/preview', // Zoom Apps require OWASP headers on Home URL
 ];
 
 // Default username

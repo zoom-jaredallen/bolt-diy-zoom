@@ -376,8 +376,8 @@ export function buildZoomAppManifest(options: {
 }): ZoomAppManifest {
   const {
     appName,
-    description = `${appName} - Built with Bolt.diy`,
-    longDescription = 'A Zoom App created using Bolt.diy - the AI-powered web development environment.',
+    description = `${appName} - Built with Zoom App Builder`,
+    longDescription = 'A Zoom App created using Zoom App Builder - the AI-powered web development environment.',
     scopes = ZOOM_APP_DEFAULTS.default_scopes,
     previewId,
     products = ZOOM_APP_DEFAULTS.default_products,
