@@ -83,3 +83,28 @@ export interface FileHistory {
   // Novo campo para rastrear a origem das mudanças
   changeSource?: 'user' | 'auto-save' | 'external';
 }
+
+// Pending Changes Types for File Diff Preview (Safety + Transparency)
+export type PendingChangeAction = 'create' | 'modify' | 'delete';
+export type PendingChangeStatus = 'pending' | 'approved' | 'rejected' | 'applied';
+
+export interface PendingFileChange {
+  id: string;
+  filePath: string;
+  originalContent: string;
+  newContent: string;
+  action: PendingChangeAction;
+  status: PendingChangeStatus;
+  timestamp: number;
+  messageId?: string;
+  additions?: number;
+  deletions?: number;
+}
+
+export interface PendingChangesState {
+  changes: PendingFileChange[];
+  isReviewModalOpen: boolean;
+  autoApprove: boolean;
+  selectedChangeId: string | null;
+  viewMode: 'inline' | 'side-by-side';
+}
