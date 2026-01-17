@@ -19,6 +19,8 @@ import { ColorSchemeDialog } from '~/components/ui/ColorSchemeDialog';
 import type { DesignScheme } from '~/types/design-scheme';
 import type { ElementInfo } from '~/components/workbench/Inspector';
 import { McpTools } from './MCPTools';
+import { useStore } from '@nanostores/react';
+import { planStore, setMode } from '~/lib/stores/plan';
 
 interface ChatBoxProps {
   isModelSettingsCollapsed: boolean;
@@ -64,6 +66,8 @@ interface ChatBoxProps {
 }
 
 export const ChatBox: React.FC<ChatBoxProps> = (props) => {
+  const { mode: planMode } = useStore(planStore);
+
   return (
     <div
       className={classNames(
@@ -287,6 +291,23 @@ export const ChatBox: React.FC<ChatBoxProps> = (props) => {
               onStop={props.stopListening}
               disabled={props.isStreaming}
             />
+            {/* Plan/Act Mode Toggle */}
+            <IconButton
+              title={
+                planMode === 'plan' ? 'Plan Mode - Creates a plan before executing' : 'Act Mode - Executes directly'
+              }
+              className={classNames(
+                'transition-all flex items-center gap-1 px-1.5',
+                planMode === 'plan'
+                  ? '!bg-bolt-elements-item-backgroundAccent !text-bolt-elements-item-contentAccent'
+                  : 'bg-bolt-elements-item-backgroundDefault text-bolt-elements-item-contentDefault',
+              )}
+              onClick={() => setMode(planMode === 'plan' ? 'act' : 'plan')}
+              disabled={props.isStreaming}
+            >
+              <div className={planMode === 'plan' ? 'i-ph:clipboard-text text-xl' : 'i-ph:lightning text-xl'} />
+              <span>{planMode === 'plan' ? 'Plan' : 'Act'}</span>
+            </IconButton>
             {props.chatStarted && (
               <IconButton
                 title="Discuss"

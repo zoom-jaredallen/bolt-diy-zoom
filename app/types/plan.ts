@@ -83,3 +83,22 @@ export interface PlanStepAnnotation {
   status: PlanStepStatus;
   output?: string;
 }
+
+// Task Progress Tracking (Cline-style checklist)
+export interface TaskProgressItem {
+  id: string;
+  title: string;
+  completed: boolean;
+  order: number;
+}
+
+export interface TaskProgress {
+  items: TaskProgressItem[];
+  lastUpdated: number;
+  chatId?: string;
+}
+
+export interface TaskProgressAnnotation {
+  type: 'taskProgress';
+  progress: TaskProgress;
+}

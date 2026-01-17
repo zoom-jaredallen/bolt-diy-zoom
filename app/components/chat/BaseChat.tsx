@@ -33,9 +33,9 @@ import { ChatBox } from './ChatBox';
 import type { DesignScheme } from '~/types/design-scheme';
 import type { ElementInfo } from '~/components/workbench/Inspector';
 import LlmErrorAlert from './LLMApiAlert';
-import { PlanModeToggle } from '~/components/chat/PlanModeToggle';
 import { PlanSteps } from '~/components/chat/PlanSteps';
 import { planStore } from '~/lib/stores/plan';
+import { TaskProgressDisplay } from '~/components/chat/TaskProgressDisplay';
 
 const TEXTAREA_MIN_HEIGHT = 76;
 
@@ -430,24 +430,24 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
                 </div>
                 {progressAnnotations && <ProgressCompilation data={progressAnnotations} />}
 
-                {/* Plan Mode Controls - Available before and after chat starts */}
-                <div className="flex flex-col gap-3">
-                  <PlanModeToggle disabled={isStreaming} />
-                  {chatStarted && planState.currentPlan && (
-                    <PlanSteps
-                      onExecute={() => {
-                        // When plan is approved, trigger execution
-                        if (sendMessage) {
-                          const firstStep = planState.currentPlan?.steps[0];
+                {/* Task Progress Display - Shows during streaming */}
+                {isStreaming && <TaskProgressDisplay className="max-w-chat mx-auto" />}
 
-                          if (firstStep) {
-                            sendMessage({} as any, `Execute step 1: ${firstStep.title}`);
-                          }
+                {/* Plan Steps - Show when there's an active plan */}
+                {chatStarted && planState.currentPlan && (
+                  <PlanSteps
+                    onExecute={() => {
+                      // When plan is approved, trigger execution
+                      if (sendMessage) {
+                        const firstStep = planState.currentPlan?.steps[0];
+
+                        if (firstStep) {
+                          sendMessage({} as any, `Execute step 1: ${firstStep.title}`);
                         }
-                      }}
-                    />
-                  )}
-                </div>
+                      }
+                    }}
+                  />
+                )}
 
                 <ChatBox
                   isModelSettingsCollapsed={isModelSettingsCollapsed}
