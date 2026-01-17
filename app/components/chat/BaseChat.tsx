@@ -33,6 +33,9 @@ import { ChatBox } from './ChatBox';
 import type { DesignScheme } from '~/types/design-scheme';
 import type { ElementInfo } from '~/components/workbench/Inspector';
 import LlmErrorAlert from './LLMApiAlert';
+import { PlanModeToggle } from '~/components/chat/PlanModeToggle';
+import { PlanSteps } from '~/components/chat/PlanSteps';
+import { planStore } from '~/lib/stores/plan';
 
 const TEXTAREA_MIN_HEIGHT = 76;
 
@@ -144,6 +147,7 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
     const [progressAnnotations, setProgressAnnotations] = useState<ProgressAnnotation[]>([]);
     const expoUrl = useStore(expoUrlAtom);
     const [qrModalOpen, setQrModalOpen] = useState(false);
+    const planState = useStore(planStore);
 
     useEffect(() => {
       if (expoUrl) {
@@ -425,6 +429,28 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
                   {llmErrorAlert && <LlmErrorAlert alert={llmErrorAlert} clearAlert={() => clearLlmErrorAlert?.()} />}
                 </div>
                 {progressAnnotations && <ProgressCompilation data={progressAnnotations} />}
+
+                {/* Plan Mode Controls */}
+                {chatStarted && (
+                  <div className="flex flex-col gap-3">
+                    <PlanModeToggle disabled={isStreaming} />
+                    {planState.currentPlan && (
+                      <PlanSteps
+                        onExecute={() => {
+                          // When plan is approved, trigger execution
+                          if (sendMessage) {
+                            const firstStep = planState.currentPlan?.steps[0];
+
+                            if (firstStep) {
+                              sendMessage({} as any, `Execute step 1: ${firstStep.title}`);
+                            }
+                          }
+                        }}
+                      />
+                    )}
+                  </div>
+                )}
+
                 <ChatBox
                   isModelSettingsCollapsed={isModelSettingsCollapsed}
                   setIsModelSettingsCollapsed={setIsModelSettingsCollapsed}

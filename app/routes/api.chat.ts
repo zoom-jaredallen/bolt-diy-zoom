@@ -14,6 +14,8 @@ import { extractPropertiesFromMessage } from '~/lib/.server/llm/utils';
 import type { DesignScheme } from '~/types/design-scheme';
 import { MCPService } from '~/lib/services/mcpService';
 import { StreamRecoveryManager } from '~/lib/.server/llm/stream-recovery';
+import type { PlanMode, Plan } from '~/types/plan';
+import { PLAN_MODE_SYSTEM_PROMPT } from '~/lib/common/prompts/plan-prompt';
 
 export async function action(args: ActionFunctionArgs) {
   return chatAction(args);
@@ -48,7 +50,7 @@ async function chatAction({ context, request }: ActionFunctionArgs) {
     },
   });
 
-  const { messages, files, promptId, contextOptimization, supabase, chatMode, designScheme, maxLLMSteps } =
+  const { messages, files, promptId, contextOptimization, supabase, chatMode, designScheme, maxLLMSteps, planMode, currentPlan, currentStepIndex } =
     await request.json<{
       messages: Messages;
       files: any;
@@ -65,7 +67,30 @@ async function chatAction({ context, request }: ActionFunctionArgs) {
         };
       };
       maxLLMSteps: number;
+      planMode?: PlanMode;
+      currentPlan?: Plan;
+      currentStepIndex?: number;
     }>();
+
+  // Log plan mode status and prepare plan context
+  let planContext = '';
+
+  if (planMode === 'plan') {
+    logger.debug('Running in PLAN mode - generating execution plan');
+    planContext = PLAN_MODE_SYSTEM_PROMPT;
+  } else if (planMode === 'act' && currentPlan) {
+    logger.debug(`Running in ACT mode - executing step ${(currentStepIndex ?? 0) + 1} of ${currentPlan.steps.length}`);
+    const step = currentPlan.steps[currentStepIndex ?? 0];
+
+    if (step) {
+      planContext = `\n\n[PLAN EXECUTION MODE]\nYou are executing step ${(currentStepIndex ?? 0) + 1} of ${currentPlan.steps.length}: "${step.title}"\n\nStep description: ${step.description}\n\nFocus on completing this step thoroughly before moving on.`;
+    }
+  }
+
+  // Log plan context if present (will be used in future prompt injection)
+  if (planContext) {
+    logger.debug(`Plan context length: ${planContext.length} characters`);
+  }
 
   const cookieHeader = request.headers.get('Cookie');
   const apiKeys = JSON.parse(parseCookies(cookieHeader || '').apiKeys || '{}');
