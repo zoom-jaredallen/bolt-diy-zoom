@@ -1,6 +1,15 @@
 import { app } from './server.js';
 import { processManager } from './processManager.js';
 import { initializeZoomApiAdapter, isZoomApiAvailable } from './zoomApiAdapter.js';
+import { readFileSync } from 'fs';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
+
+// Get version from package.json
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const packageJson = JSON.parse(readFileSync(join(__dirname, '..', 'package.json'), 'utf-8'));
+const VERSION = packageJson.version;
 
 const PORT = process.env.MCP_PROXY_PORT || 3100;
 
@@ -22,7 +31,7 @@ async function main() {
   // Start server
   app.listen(PORT, () => {
     console.log('============================================================');
-    console.log('  MCP Proxy Server');
+    console.log(`  MCP Proxy Server v${VERSION}`);
     console.log('============================================================');
     console.log(`  Port: ${PORT}`);
     console.log(`  Health: http://localhost:${PORT}/health`);
