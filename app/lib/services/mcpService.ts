@@ -343,9 +343,20 @@ export class MCPService {
         const toolSet: ToolSet = {};
 
         for (const [toolName, toolInfo] of Object.entries(data.tools)) {
+          /*
+           * Use z.any() as fallback for non-Zod input schemas.
+           * The inputSchema from proxy is a plain JSON object, not a Zod schema.
+           * Zod expects schemas to have internal properties like `_def.typeName`.
+           * Using z.any() allows the tool to work without schema validation breaking.
+           */
+          const parameters = z.any();
+
+          // Store the original JSON schema for display purposes
+          (parameters as any).jsonSchema = toolInfo.inputSchema;
+
           toolSet[toolName] = {
             description: toolInfo.description,
-            parameters: toolInfo.inputSchema as z.ZodTypeAny,
+            parameters,
             execute: async (args: Record<string, unknown>) => {
               const executeResponse = await fetch(`${MCP_PROXY_URL}/api/execute/${sessionId}`, {
                 method: 'POST',
