@@ -1,0 +1,44 @@
+{
+  "name": "@zoom/mcp-api-server",
+  "version": "1.0.0",
+  "description": "MCP server providing Zoom API documentation and endpoint details",
+  "type": "module",
+  "main": "dist/index.js",
+  "bin": {
+    "zoom-mcp-server": "dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc && npm run copy-data",
+    "copy-data": "cp -r src/data dist/",
+    "dev": "tsx watch src/index.ts",
+    "start": "node dist/index.js",
+    "start:http": "node dist/index.js --http",
+    "fetch-specs": "tsx scripts/fetch-specs.ts",
+    "build-index": "tsx scripts/build-index.ts",
+    "prepare-data": "npm run fetch-specs && npm run build-index",
+    "lint": "eslint src/"
+  },
+  "keywords": [
+    "zoom",
+    "mcp",
+    "api",
+    "model-context-protocol",
+    "ai",
+    "llm"
+  ],
+  "author": "Zoom Developer Platform",
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "shadcn": "^3.7.0",
+    "tsx": "^4.7.0",
+    "typescript": "^5.3.3"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

@@ -1,0 +1,27 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Raw API specs (large files, fetched on demand)
+data/raw-specs/
+
+# Generated data files (regenerated from specs)
+src/data/categories.json
+src/data/endpoints-index.json
+src/data/scopes-map.json
+src/data/endpoints/
+
+# Logs
+*.log
+npm-debug.log*
+
+# IDE
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db

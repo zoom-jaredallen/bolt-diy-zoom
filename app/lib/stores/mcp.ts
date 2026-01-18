@@ -2,11 +2,41 @@ import { create } from 'zustand';
 import type { MCPConfig, MCPServerTools } from '~/lib/services/mcpService';
 
 const MCP_SETTINGS_KEY = 'mcp_settings';
+const MCP_CONFIG_VERSION_KEY = 'mcp_config_version';
+const CURRENT_CONFIG_VERSION = 2; // Increment when adding new default servers
 const isBrowser = typeof window !== 'undefined';
 
 type MCPSettings = {
   mcpConfig: MCPConfig;
   maxLLMSteps: number;
+};
+
+/*
+ * Default MCP servers that should be available to all users.
+ * When adding new default servers, increment CURRENT_CONFIG_VERSION above.
+ */
+const defaultMCPServers = {
+  /* shadcn/ui MCP server - https://ui.shadcn.com/docs/mcp */
+  shadcn: {
+    type: 'stdio' as const,
+    command: 'npx',
+    args: ['shadcn@latest', 'mcp'],
+  },
+
+  /* Context7 - Live npm/framework documentation - https://context7.com */
+  context7: {
+    type: 'streamable-http' as const,
+    url: 'https://mcp.context7.com/mcp',
+  },
+
+  /*
+   * Zoom API - Zoom API endpoint documentation and discovery
+   * Provides tools: zoom_list_categories, zoom_search_endpoints, zoom_get_endpoint, zoom_get_scopes
+   */
+  'zoom-api': {
+    type: 'streamable-http' as const,
+    url: 'https://zoomvibes.j4red4llen.com/mcp/zoom-api',
+  },
 };
 
 const defaultSettings = {
@@ -15,14 +45,26 @@ const defaultSettings = {
     mcpServers: {
       /* shadcn/ui MCP server - https://ui.shadcn.com/docs/mcp */
       shadcn: {
-        type: 'streamable-http',
-        url: 'https://mcp.shadcn.com/mcp',
+        type: 'stdio',
+        command: 'npx',
+        args: ['shadcn@latest', 'mcp'],
       },
 
       /* Context7 - Live npm/framework documentation - https://context7.com */
       context7: {
         type: 'streamable-http',
         url: 'https://mcp.context7.com/mcp',
+      },
+
+      /*
+       * Zoom API - Zoom API endpoint documentation and discovery
+       * Provides tools: zoom_list_categories, zoom_search_endpoints, zoom_get_endpoint, zoom_get_scopes
+       * For local development, use stdio config instead:
+       * 'zoom-api': { type: 'stdio', command: 'node', args: ['./mcp/zoom-api/dist/index.js'] }
+       */
+      'zoom-api': {
+        type: 'streamable-http',
+        url: 'https://zoomvibes.j4red4llen.com/mcp/zoom-api',
       },
     },
   },
@@ -55,10 +97,41 @@ export const useMCPStore = create<Store & Actions>((set, get) => ({
 
     if (isBrowser) {
       const savedConfig = localStorage.getItem(MCP_SETTINGS_KEY);
+      const savedVersion = parseInt(localStorage.getItem(MCP_CONFIG_VERSION_KEY) || '0', 10);
 
       if (savedConfig) {
         try {
-          const settings = JSON.parse(savedConfig) as MCPSettings;
+          let settings = JSON.parse(savedConfig) as MCPSettings;
+
+          /*
+           * Migration logic: Add missing default MCP servers to existing configs.
+           * This ensures users get new default servers while keeping their custom ones.
+           */
+          if (savedVersion < CURRENT_CONFIG_VERSION) {
+            const existingServers = settings.mcpConfig?.mcpServers || {};
+
+            // Merge defaults with user's existing servers (user's servers take priority)
+            const mergedServers = {
+              ...defaultMCPServers,
+              ...existingServers,
+            };
+
+            settings = {
+              ...settings,
+              mcpConfig: {
+                ...settings.mcpConfig,
+                mcpServers: mergedServers as MCPConfig['mcpServers'],
+              },
+            };
+
+            // Save migrated config
+            localStorage.setItem(MCP_SETTINGS_KEY, JSON.stringify(settings));
+            localStorage.setItem(MCP_CONFIG_VERSION_KEY, String(CURRENT_CONFIG_VERSION));
+            console.info(
+              `MCP config migrated from version ${savedVersion} to ${CURRENT_CONFIG_VERSION}. Added default servers.`,
+            );
+          }
+
           const serverTools = await updateServerConfig(settings.mcpConfig);
           set(() => ({ settings, serverTools }));
         } catch (error) {
@@ -68,7 +141,9 @@ export const useMCPStore = create<Store & Actions>((set, get) => ({
           }));
         }
       } else {
+        // New user: save defaults and version
         localStorage.setItem(MCP_SETTINGS_KEY, JSON.stringify(defaultSettings));
+        localStorage.setItem(MCP_CONFIG_VERSION_KEY, String(CURRENT_CONFIG_VERSION));
       }
     }
 
