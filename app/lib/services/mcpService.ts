@@ -20,6 +20,37 @@ import { createScopedLogger } from '~/utils/logger';
 
 const logger = createScopedLogger('mcp-service');
 
+// MCP Proxy configuration
+const MCP_PROXY_URL = process.env.MCP_PROXY_URL || 'http://localhost:3100';
+let _proxyAvailable: boolean | null = null;
+
+/**
+ * Check if the MCP Proxy is available
+ */
+async function checkProxyAvailable(): Promise<boolean> {
+  if (_proxyAvailable !== null) {
+    return _proxyAvailable;
+  }
+
+  try {
+    const response = await fetch(`${MCP_PROXY_URL}/health`, { method: 'GET' });
+    _proxyAvailable = response.ok;
+    logger.debug(`MCP Proxy availability: ${_proxyAvailable ? 'available' : 'unavailable'}`);
+  } catch {
+    _proxyAvailable = false;
+    logger.debug('MCP Proxy not available');
+  }
+
+  return _proxyAvailable;
+}
+
+/**
+ * Reset proxy availability check (useful for retrying)
+ */
+export function resetProxyCheck(): void {
+  _proxyAvailable = null;
+}
+
 export const stdioServerConfigSchema = z
   .object({
     type: z.enum(['stdio']).optional(),
@@ -200,9 +231,115 @@ export class MCPService {
       `Creating STDIO client for '${serverName}' with command: '${config.command}' ${config.args?.join(' ') || ''}`,
     );
 
+    // Try to use the MCP Proxy for stdio servers (works in browser/Cloudflare)
+    const proxyAvailable = await checkProxyAvailable();
+
+    if (proxyAvailable) {
+      logger.debug(`Using MCP Proxy for stdio server '${serverName}'`);
+
+      return this._createProxyStdioClient(serverName, config);
+    }
+
+    // Fall back to direct stdio (only works in Node.js environment)
+    logger.debug(`Using direct stdio for '${serverName}' (proxy not available)`);
+
     const client = await experimental_createMCPClient({ transport: new Experimental_StdioMCPTransport(config) });
 
     return Object.assign(client, { serverName });
+  }
+
+  /**
+   * Create a proxy-based client for stdio MCP servers
+   * This allows stdio servers to work in browser/Cloudflare environments
+   */
+  private async _createProxyStdioClient(serverName: string, config: STDIOServerConfig): Promise<MCPClient> {
+    // Spawn the server via proxy
+    const spawnResponse = await fetch(`${MCP_PROXY_URL}/api/spawn`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        serverName,
+        config: {
+          command: config.command,
+          args: config.args || [],
+          cwd: config.cwd,
+          env: config.env,
+        },
+      }),
+    });
+
+    if (!spawnResponse.ok) {
+      const error = await spawnResponse.json().catch(() => ({ error: 'Unknown error' }));
+
+      throw new Error(`Failed to spawn via proxy: ${(error as { error: string }).error}`);
+    }
+
+    const spawnResult = (await spawnResponse.json()) as {
+      sessionId: string;
+      serverName: string;
+      status: string;
+      error?: string;
+    };
+
+    if (spawnResult.status === 'error') {
+      throw new Error(`Proxy spawn error: ${spawnResult.error}`);
+    }
+
+    const { sessionId } = spawnResult;
+
+    // Create a proxy client wrapper
+    const proxyClient: MCPClient = {
+      serverName,
+      tools: async () => {
+        const toolsResponse = await fetch(`${MCP_PROXY_URL}/api/tools/${sessionId}`);
+
+        if (!toolsResponse.ok) {
+          throw new Error('Failed to get tools from proxy');
+        }
+
+        const data = (await toolsResponse.json()) as {
+          tools: Record<string, { name: string; description?: string; inputSchema?: unknown }>;
+        };
+
+        // Convert proxy tools to ToolSet format with execute functions
+        const toolSet: ToolSet = {};
+
+        for (const [toolName, toolInfo] of Object.entries(data.tools)) {
+          toolSet[toolName] = {
+            description: toolInfo.description,
+            parameters: toolInfo.inputSchema as z.ZodTypeAny,
+            execute: async (args: Record<string, unknown>) => {
+              const executeResponse = await fetch(`${MCP_PROXY_URL}/api/execute/${sessionId}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ toolName, args }),
+              });
+
+              if (!executeResponse.ok) {
+                const error = await executeResponse.json().catch(() => ({ error: 'Unknown error' }));
+
+                throw new Error(`Tool execution failed: ${(error as { error: string }).error}`);
+              }
+
+              const result = (await executeResponse.json()) as { result?: unknown };
+
+              return result.result;
+            },
+          };
+        }
+
+        return toolSet;
+      },
+      close: async () => {
+        try {
+          await fetch(`${MCP_PROXY_URL}/api/close/${sessionId}`, { method: 'DELETE' });
+        } catch (error) {
+          logger.error(`Failed to close proxy session for ${serverName}:`, error);
+        }
+      },
+    };
+
+    return proxyClient;
   }
 
   private _registerTools(serverName: string, tools: ToolSet) {

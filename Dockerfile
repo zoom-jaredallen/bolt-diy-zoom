@@ -13,6 +13,12 @@ COPY . .
 ENV NODE_OPTIONS="--max-old-space-size=6144"
 RUN pnpm run build
 
+# Build MCP proxy server
+RUN cd mcp/proxy && npm ci && npm run build
+
+# Build MCP zoom-api server (optional - for local development)
+RUN cd mcp/zoom-api && npm ci && npm run build
+
 # ---- runtime stage ----
 FROM node:22-bookworm AS runtime
 WORKDIR /app
@@ -38,4 +44,3 @@ RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 EXPOSE 5173
 ENTRYPOINT ["docker-entrypoint.sh"]
 CMD ["pnpm","run","dockerstart"]
-

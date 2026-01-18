@@ -1,0 +1,128 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: zoomvibes
+  namespace: zoomvibes
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: zoomvibes
+  template:
+    metadata:
+      labels:
+        app: zoomvibes
+    spec:
+      containers:
+        # Main application container
+        - name: zoomvibes
+          image: docker.io/jaredallen648/bolt-diy-zoom:latest
+          imagePullPolicy: Always
+          command: ["pnpm", "run", "dockerstart"]
+          ports:
+            - containerPort: 5173
+              name: http
+          env:
+            - name: PORT
+              value: "5173"
+            # Point to MCP Proxy running in sidecar
+            - name: MCP_PROXY_URL
+              value: "http://localhost:3100"
+          envFrom:
+            - secretRef:
+                name: zoomvibes-secrets
+          volumeMounts:
+            - name: run
+              mountPath: /app/run
+          resources:
+            requests:
+              cpu: "500m"
+              memory: "2Gi"
+            limits:
+              cpu: "2"
+              memory: "8Gi"
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: 5173
+            initialDelaySeconds: 20
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: 5173
+            initialDelaySeconds: 60
+            periodSeconds: 20
+
+        # MCP Proxy sidecar container
+        - name: mcp-proxy
+          image: docker.io/jaredallen648/bolt-diy-zoom:latest
+          imagePullPolicy: Always
+          command: ["node", "mcp/proxy/dist/index.js"]
+          ports:
+            - containerPort: 3100
+              name: mcp-proxy
+          env:
+            - name: MCP_PROXY_PORT
+              value: "3100"
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "256Mi"
+            limits:
+              cpu: "500m"
+              memory: "1Gi"
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 3100
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 3100
+            initialDelaySeconds: 10
+            periodSeconds: 20
+
+      volumes:
+        - name: run
+          persistentVolumeClaim:
+            claimName: zoomvibes-run-pvc
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: zoomvibes
+  namespace: zoomvibes
+spec:
+  ingressClassName: traefik
+  rules:
+    - host: zoomvibes.j4red4llen.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: zoomvibes
+                port:
+                  number: 80
+  tls:
+    - hosts:
+        - zoomvibes.j4red4llen.com
+      secretName: zoomvibes-j4red4llen-com-tls
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: zoomvibes
+  namespace: zoomvibes
+spec:
+  selector:
+    app: zoomvibes
+  ports:
+    - name: http
+      port: 80
+      targetPort: 5173
+  type: ClusterIP
