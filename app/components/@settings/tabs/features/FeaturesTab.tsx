@@ -6,6 +6,9 @@ import { useSettings } from '~/lib/hooks/useSettings';
 import { classNames } from '~/utils/classNames';
 import { toast } from 'react-toastify';
 import { PromptLibrary } from '~/lib/common/prompt-library';
+import { useStore } from '@nanostores/react';
+import { diffState, setDiffPreviewEnabled, setAutoApproveSmallChanges } from '~/lib/stores/diff';
+import { planStore, setAutoExecute } from '~/lib/stores/plan';
 
 interface FeatureToggle {
   id: string;
@@ -119,6 +122,10 @@ export default function FeaturesTab() {
     promptId,
   } = useSettings();
 
+  // AI Enhancement Features
+  const diffSettings = useStore(diffState);
+  const planSettings = useStore(planStore);
+
   // Enable features by default on first load
   React.useEffect(() => {
     // Only set defaults if values are undefined
@@ -170,6 +177,25 @@ export default function FeaturesTab() {
           break;
         }
 
+        // AI Enhancement Features
+        case 'diffPreview': {
+          setDiffPreviewEnabled(enabled);
+          toast.success(`File diff preview ${enabled ? 'enabled' : 'disabled'}`);
+          break;
+        }
+
+        case 'autoApproveSmall': {
+          setAutoApproveSmallChanges(enabled);
+          toast.success(`Auto-approve small changes ${enabled ? 'enabled' : 'disabled'}`);
+          break;
+        }
+
+        case 'autoExecution': {
+          setAutoExecute(enabled);
+          toast.success(`Auto-execution ${enabled ? 'enabled' : 'disabled'}`);
+          break;
+        }
+
         default:
           break;
       }
@@ -213,7 +239,35 @@ export default function FeaturesTab() {
         tooltip: 'Enabled by default to record detailed logs of system events and user actions',
       },
     ],
-    beta: [],
+    beta: [
+      {
+        id: 'diffPreview',
+        title: 'File Diff Preview',
+        description: 'Review AI file changes before they are applied',
+        icon: 'i-ph:git-diff',
+        enabled: diffSettings.isEnabled,
+        beta: true,
+        tooltip: 'Shows a diff preview with approve/reject options when AI modifies files',
+      },
+      {
+        id: 'autoApproveSmall',
+        title: 'Auto-Approve Small Changes',
+        description: 'Skip diff preview for minor changes',
+        icon: 'i-ph:check-circle',
+        enabled: diffSettings.autoApproveSmallChanges,
+        beta: true,
+        tooltip: 'Automatically approve file changes under 10 lines',
+      },
+      {
+        id: 'autoExecution',
+        title: 'Auto-Execution Mode',
+        description: 'Execute plan steps automatically',
+        icon: 'i-ph:play-circle',
+        enabled: planSettings.autoExecute,
+        beta: true,
+        tooltip: 'Continue executing steps without manual approval (use with caution)',
+      },
+    ],
   };
 
   return (

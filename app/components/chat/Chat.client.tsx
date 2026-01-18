@@ -28,7 +28,9 @@ import type { ElementInfo } from '~/components/workbench/Inspector';
 import type { TextUIPart, FileUIPart, Attachment } from '@ai-sdk/ui-utils';
 import { useMCPStore } from '~/lib/stores/mcp';
 import type { LlmErrorAlertType } from '~/types/actions';
-import { planStore } from '~/lib/stores/plan';
+import { planStore, isPlanMode, parsePlanFromResponse, setGeneratingPlan } from '~/lib/stores/plan';
+import { updateTaskProgressFromStream } from '~/lib/stores/taskProgress';
+import { recordTokenUsage } from '~/lib/stores/tokenUsage';
 
 const logger = createScopedLogger('Chat');
 
@@ -169,6 +171,14 @@ export const ChatImpl = memo(
 
         if (usage) {
           console.log('Token usage:', usage);
+
+          // Record token usage for auto-execution budget tracking
+          recordTokenUsage({
+            promptTokens: usage.promptTokens || 0,
+            completionTokens: usage.completionTokens || 0,
+            totalTokens: usage.totalTokens || 0,
+          });
+
           logStore.logProvider('Chat response completed', {
             component: 'Chat',
             action: 'response',
@@ -177,6 +187,23 @@ export const ChatImpl = memo(
             usage,
             messageLength: message.content.length,
           });
+        }
+
+        // Auto-parse plan from response when in Plan mode
+        if (isPlanMode.get() && message.content) {
+          setGeneratingPlan(false);
+
+          const chatId = window.location.pathname.split('/').pop() || 'default';
+          const plan = parsePlanFromResponse(message.content, chatId);
+
+          if (plan) {
+            logger.info('Plan parsed automatically:', plan.title, `(${plan.steps.length} steps)`);
+          }
+        }
+
+        // Auto-parse task progress from response
+        if (message.content) {
+          updateTaskProgressFromStream(message.content);
         }
 
         logger.debug('Finished streaming');

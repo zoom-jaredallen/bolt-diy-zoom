@@ -36,6 +36,8 @@ import LlmErrorAlert from './LLMApiAlert';
 import { PlanSteps } from '~/components/chat/PlanSteps';
 import { planStore } from '~/lib/stores/plan';
 import { TaskProgressDisplay } from '~/components/chat/TaskProgressDisplay';
+import { AutoExecutionControls } from '~/components/chat/AutoExecutionControls';
+import type { PlanStep } from '~/types/plan';
 
 const TEXTAREA_MIN_HEIGHT = 76;
 
@@ -445,6 +447,33 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
                           sendMessage({} as any, `Execute step 1: ${firstStep.title}`);
                         }
                       }
+                    }}
+                  />
+                )}
+
+                {/* Auto-Execution Controls - Show when plan is approved */}
+                {chatStarted && planState.isPlanApproved && (
+                  <AutoExecutionControls
+                    className="max-w-chat mx-auto mb-2"
+                    onExecuteStep={async (step: PlanStep, index: number) => {
+                      // Execute step by sending message to LLM
+                      return new Promise((resolve) => {
+                        if (sendMessage) {
+                          const stepMessage = `[AUTO-EXECUTE] Step ${index + 1}: ${step.title}\n\n${step.description}`;
+                          sendMessage({} as any, stepMessage);
+
+                          // For now, assume success - in production this would track actual response
+                          setTimeout(() => {
+                            resolve({ tokensUsed: 1000, success: true });
+                          }, 5000);
+                        } else {
+                          resolve({ tokensUsed: 0, success: false, error: 'sendMessage not available' });
+                        }
+                      });
+                    }}
+                    onConfirmationNeeded={async (step: PlanStep, reason: string) => {
+                      // Show confirmation dialog for dangerous actions
+                      return window.confirm(`Step "${step.title}" requires confirmation:\n\n${reason}\n\nProceed?`);
                     }}
                   />
                 )}

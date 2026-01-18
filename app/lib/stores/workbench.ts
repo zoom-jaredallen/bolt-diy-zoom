@@ -18,6 +18,7 @@ import { description } from '~/lib/persistence';
 import Cookies from 'js-cookie';
 import { createSampler } from '~/utils/sampler';
 import type { ActionAlert, DeployAlert, SupabaseAlert } from '~/types/actions';
+import { queueDiff, diffState } from '~/lib/stores/diff';
 
 const { saveAs } = fileSaver;
 
@@ -580,6 +581,24 @@ export class WorkbenchStore {
       }
 
       const doc = this.#editorStore.documents.get()[fullPath];
+
+      // File Diff Preview - Queue for approval before writing
+      if (!isStreaming && diffState.get().isEnabled && data.action.content) {
+        const existingContent = doc?.value || '';
+        const approved = await queueDiff({
+          filePath: fullPath,
+          originalContent: existingContent,
+          newContent: data.action.content,
+          isNew: !doc,
+          isDeleted: false,
+        });
+
+        if (!approved) {
+          console.log('File change rejected:', fullPath);
+
+          return; // Skip file write if rejected
+        }
+      }
 
       if (!doc) {
         await artifact.runner.runAction(data, isStreaming);
