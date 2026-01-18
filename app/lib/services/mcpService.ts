@@ -24,6 +24,11 @@ const logger = createScopedLogger('mcp-service');
 const MCP_PROXY_URL = process.env.MCP_PROXY_URL || 'http://localhost:3100';
 let _proxyAvailable: boolean | null = null;
 
+// Server-specific API key injection
+const MCP_SERVER_API_KEYS: Record<string, string | undefined> = {
+  context7: process.env.CONTEXT7_API_KEY,
+};
+
 /**
  * Check if the MCP Proxy is available
  */
@@ -205,10 +210,23 @@ export class MCPService {
   ): Promise<MCPClient> {
     logger.debug(`Creating Streamable-HTTP client for ${serverName} with URL: ${config.url}`);
 
+    // Merge environment-based API keys with config headers
+    const apiKey = MCP_SERVER_API_KEYS[serverName];
+    const headers: Record<string, string> = {
+      ...config.headers,
+    };
+
+    // Inject API key as Bearer token if available
+    if (apiKey) {
+      // eslint-disable-next-line dot-notation
+      headers['Authorization'] = `Bearer ${apiKey}`;
+      logger.debug(`Injecting API key for ${serverName} from environment`);
+    }
+
     const client = await experimental_createMCPClient({
       transport: new StreamableHTTPClientTransport(new URL(config.url), {
         requestInit: {
-          headers: config.headers,
+          headers: Object.keys(headers).length > 0 ? headers : undefined,
         },
       }),
     });
