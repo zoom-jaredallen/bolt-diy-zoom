@@ -19,6 +19,10 @@ import Cookies from 'js-cookie';
 import { createSampler } from '~/utils/sampler';
 import type { ActionAlert, DeployAlert, SupabaseAlert } from '~/types/actions';
 import { queueDiff, diffState } from '~/lib/stores/diff';
+import { planStore } from '~/lib/stores/plan';
+import { createScopedLogger } from '~/utils/logger';
+
+const logger = createScopedLogger('WorkbenchStore');
 
 const { saveAs } = fileSaver;
 
@@ -540,7 +544,35 @@ export class WorkbenchStore {
     return artifact.runner.addAction(data);
   }
 
+  /**
+   * Check if action execution is allowed based on Plan mode state
+   * This is a safety guard to prevent premature execution in Plan mode
+   */
+  #canExecuteAction(): boolean {
+    const { mode, isPlanApproved, currentPlan } = planStore.get();
+
+    // If in Plan mode without approval, block execution
+    if (mode === 'plan' && !isPlanApproved) {
+      logger.debug('WorkbenchStore: Action blocked - Plan mode active, awaiting approval');
+      return false;
+    }
+
+    // If in Act mode with a plan, only allow if plan is approved
+    if (mode === 'act' && currentPlan && !isPlanApproved) {
+      logger.debug('WorkbenchStore: Action blocked - Plan not yet approved');
+      return false;
+    }
+
+    return true;
+  }
+
   runAction(data: ActionCallbackData, isStreaming: boolean = false) {
+    // SAFETY GUARD: Block actions in Plan mode until approved
+    if (!this.#canExecuteAction()) {
+      logger.info(`WorkbenchStore: Action queued but blocked (Plan mode): ${data.action.type}`);
+      return;
+    }
+
     if (isStreaming) {
       this.actionStreamSampler(data, isStreaming);
     } else {
@@ -582,8 +614,13 @@ export class WorkbenchStore {
 
       const doc = this.#editorStore.documents.get()[fullPath];
 
-      // File Diff Preview - Queue for approval before writing
-      if (!isStreaming && diffState.get().isEnabled && data.action.content) {
+      /*
+       * File Diff Preview - Queue for approval before writing
+       * Skip diff preview for reloaded messages (already applied in previous session)
+       */
+      const isReloadedMessage = this.#reloadedMessages.has(data.messageId);
+
+      if (!isStreaming && !isReloadedMessage && diffState.get().isEnabled && data.action.content) {
         const existingContent = doc?.value || '';
         const approved = await queueDiff({
           filePath: fullPath,
@@ -594,7 +631,7 @@ export class WorkbenchStore {
         });
 
         if (!approved) {
-          console.log('File change rejected:', fullPath);
+          logger.debug('File change rejected:', fullPath);
 
           return; // Skip file write if rejected
         }
