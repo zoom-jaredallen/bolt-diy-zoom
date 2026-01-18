@@ -9,7 +9,15 @@ import { getLanguageFromExtension } from '~/utils/getLanguageFromExtension';
 import type { FileHistory } from '~/types/actions';
 import { DiffView } from './DiffView';
 import { DiffViewer } from './DiffViewer';
-import { diffState, currentDiff, approveDiff, rejectDiff, closeDiffModal } from '~/lib/stores/diff';
+import {
+  diffState,
+  currentDiff,
+  pendingDiffs,
+  approveDiff,
+  rejectDiff,
+  approveAllDiffs,
+  closeDiffModal,
+} from '~/lib/stores/diff';
 import {
   type OnChangeCallback as OnEditorChange,
   type OnScrollCallback as OnEditorScroll,
@@ -309,6 +317,7 @@ export const Workbench = memo(
     // File Diff Preview states
     const diffViewerState = useStore(diffState);
     const currentDiffToShow = useStore(currentDiff);
+    const pending = useStore(pendingDiffs);
 
     const isSmallViewport = useViewport(1024);
     const streaming = useStore(streamingState);
@@ -385,8 +394,10 @@ export const Workbench = memo(
           {diffViewerState.showDiffModal && currentDiffToShow && (
             <DiffViewer
               diff={currentDiffToShow}
+              pendingCount={pending.length}
               onApprove={approveDiff}
               onReject={rejectDiff}
+              onApproveAll={approveAllDiffs}
               onClose={closeDiffModal}
             />
           )}
