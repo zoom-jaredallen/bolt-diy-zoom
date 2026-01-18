@@ -1,5 +1,6 @@
 import { useStore } from '@nanostores/react';
 import { motion, AnimatePresence } from 'framer-motion';
+import React from 'react';
 import {
   planStore,
   approvePlan,
@@ -13,6 +14,7 @@ import {
 } from '~/lib/stores/plan';
 import type { PlanStep, PlanStepStatus } from '~/types/plan';
 import { classNames } from '~/utils/classNames';
+import { sanitizePlanSummary, stripBoltTags } from '~/utils/planSanitization';
 
 interface PlanStepsProps {
   onExecute?: () => void;
@@ -46,17 +48,22 @@ export function PlanSteps({ onExecute, className }: PlanStepsProps) {
   return (
     <div
       className={classNames(
-        'bg-bolt-elements-background-depth-2 rounded-lg border border-bolt-elements-borderColor',
-        'overflow-hidden',
+        'bg-bolt-elements-background-depth-1 rounded-lg border border-bolt-elements-borderColor',
+        'overflow-hidden shadow-lg',
         className,
       )}
     >
       {/* Header */}
-      <div className="px-4 py-3 border-b border-bolt-elements-borderColor bg-bolt-elements-background-depth-3">
+      <div className="px-4 py-3 border-b border-bolt-elements-borderColor bg-bolt-elements-background-depth-2">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <PlanIcon className="w-5 h-5 text-bolt-elements-textSecondary" />
-            <h3 className="font-medium text-bolt-elements-textPrimary">{currentPlan.title}</h3>
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-purple-500/20">
+              <PlanIcon className="w-5 h-5 text-purple-400" />
+            </div>
+            <div>
+              <h3 className="font-semibold text-white text-lg">{stripBoltTags(currentPlan.title)}</h3>
+              <p className="text-xs text-gray-400">{currentPlan.steps.length} steps to complete</p>
+            </div>
           </div>
           <div className="flex items-center gap-2">
             {isExecuting && (
@@ -64,20 +71,20 @@ export function PlanSteps({ onExecute, className }: PlanStepsProps) {
                 type="button"
                 onClick={isPaused ? resumeExecution : pauseExecution}
                 className={classNames(
-                  'px-2 py-1 text-xs rounded transition-colors',
+                  'px-3 py-1.5 text-sm font-medium rounded-md transition-colors',
                   isPaused
                     ? 'bg-green-500/20 text-green-400 hover:bg-green-500/30'
                     : 'bg-yellow-500/20 text-yellow-400 hover:bg-yellow-500/30',
                 )}
               >
-                {isPaused ? 'Resume' : 'Pause'}
+                {isPaused ? '▶ Resume' : '⏸ Pause'}
               </button>
             )}
             {!isExecuting && !isCompleted && (
               <button
                 type="button"
                 onClick={clearPlan}
-                className="p-1 text-bolt-elements-textSecondary hover:text-bolt-elements-textPrimary transition-colors"
+                className="p-2 rounded-md text-gray-400 hover:text-white hover:bg-gray-700/50 transition-colors"
                 title="Clear plan"
               >
                 <CloseIcon className="w-4 h-4" />
@@ -86,20 +93,22 @@ export function PlanSteps({ onExecute, className }: PlanStepsProps) {
           </div>
         </div>
 
-        {currentPlan.summary && <p className="mt-1 text-sm text-bolt-elements-textSecondary">{currentPlan.summary}</p>}
+        {currentPlan.summary && (
+          <p className="mt-3 text-sm text-gray-300 leading-relaxed">{sanitizePlanSummary(currentPlan.summary)}</p>
+        )}
 
         {/* Progress bar */}
         {(isExecuting || isCompleted) && (
-          <div className="mt-3">
-            <div className="flex items-center justify-between text-xs text-bolt-elements-textSecondary mb-1">
-              <span>Progress</span>
-              <span>{progress}%</span>
+          <div className="mt-4">
+            <div className="flex items-center justify-between text-xs mb-2">
+              <span className="text-gray-400 font-medium">Progress</span>
+              <span className="text-white font-semibold">{progress}%</span>
             </div>
-            <div className="h-1.5 bg-bolt-elements-background-depth-1 rounded-full overflow-hidden">
+            <div className="h-2 bg-gray-700 rounded-full overflow-hidden">
               <motion.div
                 className={classNames(
                   'h-full rounded-full',
-                  isCompleted ? 'bg-green-500' : isFailed ? 'bg-red-500' : 'bg-blue-500',
+                  isCompleted ? 'bg-green-500' : isFailed ? 'bg-red-500' : 'bg-purple-500',
                 )}
                 initial={{ width: 0 }}
                 animate={{ width: `${progress}%` }}
@@ -111,13 +120,14 @@ export function PlanSteps({ onExecute, className }: PlanStepsProps) {
       </div>
 
       {/* Steps list */}
-      <div className="p-4 space-y-2 max-h-96 overflow-y-auto">
+      <div className="p-3 space-y-2 max-h-[400px] overflow-y-auto">
         <AnimatePresence>
           {currentPlan.steps.map((step, index) => (
             <StepItem
               key={step.id}
               step={step}
               index={index}
+              totalSteps={currentPlan.steps.length}
               isActive={step.status === 'in-progress'}
               canSkip={isDraft || (isExecuting && step.status === 'pending')}
               onSkip={() => skipStep(index)}
@@ -128,60 +138,58 @@ export function PlanSteps({ onExecute, className }: PlanStepsProps) {
 
       {/* Actions */}
       {isDraft && mode === 'plan' && (
-        <div className="px-4 py-3 border-t border-bolt-elements-borderColor bg-bolt-elements-background-depth-3">
-          <div className="flex items-center justify-between">
-            <p className="text-sm text-bolt-elements-textSecondary">Review this plan and approve to begin execution</p>
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={handleReject}
-                className={classNames(
-                  'px-3 py-1.5 text-sm rounded-md transition-colors',
-                  'bg-red-500/10 text-red-400 hover:bg-red-500/20',
-                )}
-              >
-                Reject
-              </button>
-              <button
-                type="button"
-                onClick={handleApprove}
-                className={classNames(
-                  'px-3 py-1.5 text-sm rounded-md transition-colors',
-                  'bg-green-500/20 text-green-400 hover:bg-green-500/30',
-                )}
-              >
-                Approve & Execute
-              </button>
-            </div>
+        <div className="px-4 py-4 border-t border-bolt-elements-borderColor bg-bolt-elements-background-depth-2">
+          <p className="text-sm text-gray-400 mb-3">Review this plan and approve to begin execution</p>
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={handleReject}
+              className="flex-1 px-4 py-2.5 text-sm font-medium rounded-lg bg-gray-700 text-gray-300 hover:bg-gray-600 transition-colors"
+            >
+              ✕ Reject
+            </button>
+            <button
+              type="button"
+              onClick={handleApprove}
+              className="flex-1 px-4 py-2.5 text-sm font-medium rounded-lg bg-purple-600 text-white hover:bg-purple-500 transition-colors"
+            >
+              ✓ Approve & Execute
+            </button>
           </div>
         </div>
       )}
 
       {/* Completion summary */}
       {isCompleted && (
-        <div className="px-4 py-3 border-t border-bolt-elements-borderColor bg-green-500/5">
-          <div className="flex items-center gap-2 text-green-400">
-            <CheckIcon className="w-5 h-5" />
-            <span className="font-medium">Plan completed successfully!</span>
+        <div className="px-4 py-4 border-t border-green-500/30 bg-green-500/10">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-full bg-green-500/20">
+              <CheckIcon className="w-5 h-5 text-green-400" />
+            </div>
+            <div>
+              <p className="font-semibold text-green-400">Plan completed successfully!</p>
+              {currentPlan.totalActualTokens && (
+                <p className="text-sm text-gray-400">
+                  Total tokens used: {currentPlan.totalActualTokens.toLocaleString()}
+                </p>
+              )}
+            </div>
           </div>
-          {currentPlan.totalActualTokens && (
-            <p className="mt-1 text-sm text-bolt-elements-textSecondary">
-              Total tokens used: {currentPlan.totalActualTokens.toLocaleString()}
-            </p>
-          )}
         </div>
       )}
 
       {/* Failed state */}
       {isFailed && (
-        <div className="px-4 py-3 border-t border-bolt-elements-borderColor bg-red-500/5">
-          <div className="flex items-center gap-2 text-red-400">
-            <ErrorIcon className="w-5 h-5" />
-            <span className="font-medium">Execution failed</span>
+        <div className="px-4 py-4 border-t border-red-500/30 bg-red-500/10">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-full bg-red-500/20">
+              <ErrorIcon className="w-5 h-5 text-red-400" />
+            </div>
+            <div>
+              <p className="font-semibold text-red-400">Execution failed</p>
+              <p className="text-sm text-gray-400">Check the failed step for details. You can retry or skip it.</p>
+            </div>
           </div>
-          <p className="mt-1 text-sm text-bolt-elements-textSecondary">
-            Check the failed step for details. You can retry or skip the failed step.
-          </p>
         </div>
       )}
     </div>
@@ -191,12 +199,13 @@ export function PlanSteps({ onExecute, className }: PlanStepsProps) {
 interface StepItemProps {
   step: PlanStep;
   index: number;
+  totalSteps: number;
   isActive: boolean;
   canSkip: boolean;
   onSkip: () => void;
 }
 
-function StepItem({ step, index, isActive, canSkip, onSkip }: StepItemProps) {
+function StepItem({ step, index, totalSteps, isActive, canSkip, onSkip }: StepItemProps) {
   const [isExpanded, setIsExpanded] = React.useState(isActive);
 
   React.useEffect(() => {
@@ -205,37 +214,116 @@ function StepItem({ step, index, isActive, canSkip, onSkip }: StepItemProps) {
     }
   }, [isActive]);
 
+  const cleanTitle = stripBoltTags(step.title);
+  const cleanDescription = sanitizePlanSummary(step.description);
+
+  // Generate helpful description if none provided
+  const getStepDetails = () => {
+    if (cleanDescription && cleanDescription.length > 10) {
+      return cleanDescription;
+    }
+
+    // Generate context based on common step patterns
+    if (cleanTitle.toLowerCase().includes('setup') || cleanTitle.toLowerCase().includes('install')) {
+      return 'This step will set up the project dependencies and configuration files needed for the application.';
+    }
+
+    if (cleanTitle.toLowerCase().includes('create') || cleanTitle.toLowerCase().includes('build')) {
+      return 'This step will create the necessary components, files, or structures for the feature.';
+    }
+
+    if (cleanTitle.toLowerCase().includes('style') || cleanTitle.toLowerCase().includes('design')) {
+      return 'This step will add styling and visual design elements to enhance the user interface.';
+    }
+
+    if (cleanTitle.toLowerCase().includes('test') || cleanTitle.toLowerCase().includes('verify')) {
+      return 'This step will verify that everything is working correctly and fix any issues found.';
+    }
+
+    return 'This step will implement the required functionality as described in the plan.';
+  };
+
+  const getStatusColor = () => {
+    if (isActive) {
+      return 'border-purple-500/50 bg-purple-500/10';
+    }
+
+    switch (step.status) {
+      case 'complete':
+        return 'border-green-500/30 bg-green-500/5';
+      case 'failed':
+        return 'border-red-500/30 bg-red-500/5';
+      case 'skipped':
+        return 'border-gray-600/30 bg-gray-600/5';
+      default:
+        return 'border-gray-700 bg-bolt-elements-background-depth-2 hover:bg-bolt-elements-background-depth-3';
+    }
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0, y: -10 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: 10 }}
-      className={classNames(
-        'rounded-lg border transition-colors',
-        isActive
-          ? 'border-blue-500/50 bg-blue-500/5'
-          : step.status === 'complete'
-            ? 'border-green-500/30 bg-green-500/5'
-            : step.status === 'failed'
-              ? 'border-red-500/30 bg-red-500/5'
-              : step.status === 'skipped'
-                ? 'border-gray-500/30 bg-gray-500/5'
-                : 'border-bolt-elements-borderColor',
-      )}
+      className={classNames('rounded-lg border transition-all duration-200', getStatusColor())}
     >
       <button
         type="button"
         onClick={() => setIsExpanded(!isExpanded)}
-        className="w-full px-3 py-2 flex items-center gap-3 text-left"
+        className="w-full px-4 py-3 flex items-center gap-4 text-left"
       >
-        <StepStatusIcon status={step.status} isActive={isActive} />
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-bolt-elements-textSecondary">Step {index + 1}</span>
-            <span className="font-medium text-bolt-elements-textPrimary truncate">{step.title}</span>
-          </div>
+        {/* Step number badge */}
+        <div
+          className={classNames(
+            'w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0',
+            isActive
+              ? 'bg-purple-500 text-white'
+              : step.status === 'complete'
+                ? 'bg-green-500 text-white'
+                : step.status === 'failed'
+                  ? 'bg-red-500 text-white'
+                  : 'bg-gray-700 text-gray-300',
+          )}
+        >
+          {step.status === 'complete' ? (
+            <CheckIcon className="w-4 h-4" />
+          ) : step.status === 'failed' ? (
+            <CloseIcon className="w-4 h-4" />
+          ) : (
+            index + 1
+          )}
         </div>
-        <ChevronIcon className={classNames('w-4 h-4 transition-transform', isExpanded && 'rotate-180')} />
+
+        {/* Step title */}
+        <div className="flex-1 min-w-0">
+          <p
+            className={classNames(
+              'font-medium text-sm leading-tight',
+              isActive || step.status === 'pending' ? 'text-white' : 'text-gray-300',
+            )}
+          >
+            {cleanTitle}
+          </p>
+          <p className="text-xs text-gray-500 mt-0.5">
+            Step {index + 1} of {totalSteps}
+            {step.estimatedTokens && ` • ~${step.estimatedTokens.toLocaleString()} tokens`}
+          </p>
+        </div>
+
+        {/* Status indicator */}
+        <div className="flex items-center gap-2">
+          {isActive && (
+            <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-purple-500/20 text-purple-400">
+              In Progress
+            </span>
+          )}
+          <ChevronIcon
+            className={classNames(
+              'w-5 h-5 text-gray-500 transition-transform duration-200',
+              isExpanded && 'rotate-180',
+            )}
+          />
+        </div>
       </button>
 
       <AnimatePresence>
@@ -244,30 +332,49 @@ function StepItem({ step, index, isActive, canSkip, onSkip }: StepItemProps) {
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: 'auto', opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.2 }}
             className="overflow-hidden"
           >
-            <div className="px-3 pb-3 pl-10">
-              <p className="text-sm text-bolt-elements-textSecondary">{step.description}</p>
+            <div className="px-4 pb-4 pt-1 ml-12 border-t border-gray-700/50">
+              {/* Description */}
+              <div className="mb-3">
+                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">What this step does</p>
+                <p className="text-sm text-gray-300 leading-relaxed">{getStepDetails()}</p>
+              </div>
 
+              {/* Substeps */}
               {step.substeps && step.substeps.length > 0 && (
-                <ul className="mt-2 space-y-1">
-                  {step.substeps.map((substep) => (
-                    <li key={substep.id} className="flex items-center gap-2 text-sm">
-                      <SubstepStatusIcon status={substep.status} />
-                      <span className="text-bolt-elements-textSecondary">{substep.title}</span>
-                    </li>
-                  ))}
-                </ul>
+                <div className="mb-3">
+                  <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Subtasks</p>
+                  <ul className="space-y-1.5">
+                    {step.substeps.map((substep) => (
+                      <li key={substep.id} className="flex items-center gap-2 text-sm">
+                        <SubstepStatusIcon status={substep.status} />
+                        <span className="text-gray-300">{stripBoltTags(substep.title)}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
               )}
 
-              {step.error && <div className="mt-2 p-2 bg-red-500/10 rounded text-sm text-red-400">{step.error}</div>}
+              {/* Error message */}
+              {step.error && (
+                <div className="mb-3 p-3 bg-red-500/10 border border-red-500/30 rounded-lg">
+                  <p className="text-xs font-medium text-red-400 uppercase tracking-wide mb-1">Error</p>
+                  <p className="text-sm text-red-300">{step.error}</p>
+                </div>
+              )}
 
+              {/* Token usage */}
               {step.actualTokens && (
-                <p className="mt-2 text-xs text-bolt-elements-textSecondary">
-                  Tokens used: {step.actualTokens.toLocaleString()}
-                </p>
+                <div className="mb-3">
+                  <p className="text-xs text-gray-500">
+                    Tokens used: <span className="text-gray-400 font-medium">{step.actualTokens.toLocaleString()}</span>
+                  </p>
+                </div>
               )}
 
+              {/* Skip action */}
               {canSkip && step.status === 'pending' && (
                 <button
                   type="button"
@@ -275,9 +382,9 @@ function StepItem({ step, index, isActive, canSkip, onSkip }: StepItemProps) {
                     e.stopPropagation();
                     onSkip();
                   }}
-                  className="mt-2 text-xs text-bolt-elements-textSecondary hover:text-bolt-elements-textPrimary"
+                  className="text-xs font-medium text-gray-500 hover:text-gray-300 transition-colors"
                 >
-                  Skip this step
+                  Skip this step →
                 </button>
               )}
             </div>
@@ -286,45 +393,6 @@ function StepItem({ step, index, isActive, canSkip, onSkip }: StepItemProps) {
       </AnimatePresence>
     </motion.div>
   );
-}
-
-import React from 'react';
-
-function StepStatusIcon({ status, isActive }: { status: PlanStepStatus; isActive: boolean }) {
-  if (isActive) {
-    return (
-      <div className="w-5 h-5 rounded-full border-2 border-blue-500 flex items-center justify-center">
-        <motion.div
-          className="w-2 h-2 bg-blue-500 rounded-full"
-          animate={{ scale: [1, 1.2, 1] }}
-          transition={{ duration: 1, repeat: Infinity }}
-        />
-      </div>
-    );
-  }
-
-  switch (status) {
-    case 'complete':
-      return (
-        <div className="w-5 h-5 rounded-full bg-green-500 flex items-center justify-center">
-          <CheckIcon className="w-3 h-3 text-white" />
-        </div>
-      );
-    case 'failed':
-      return (
-        <div className="w-5 h-5 rounded-full bg-red-500 flex items-center justify-center">
-          <CloseIcon className="w-3 h-3 text-white" />
-        </div>
-      );
-    case 'skipped':
-      return (
-        <div className="w-5 h-5 rounded-full bg-gray-500 flex items-center justify-center">
-          <SkipIcon className="w-3 h-3 text-white" />
-        </div>
-      );
-    default:
-      return <div className="w-5 h-5 rounded-full border-2 border-bolt-elements-borderColor" />;
-  }
 }
 
 function SubstepStatusIcon({ status }: { status: PlanStepStatus }) {
@@ -336,13 +404,13 @@ function SubstepStatusIcon({ status }: { status: PlanStepStatus }) {
     case 'in-progress':
       return (
         <motion.div
-          className="w-3 h-3 rounded-full bg-blue-500"
+          className="w-3 h-3 rounded-full bg-purple-500"
           animate={{ opacity: [1, 0.5, 1] }}
           transition={{ duration: 1, repeat: Infinity }}
         />
       );
     default:
-      return <div className="w-3 h-3 rounded-full border border-bolt-elements-borderColor" />;
+      return <div className="w-3 h-3 rounded-full border border-gray-600" />;
   }
 }
 
@@ -377,14 +445,6 @@ function ErrorIcon({ className }: { className?: string }) {
     <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
       <circle cx="12" cy="12" r="10" />
       <path d="M12 8v4M12 16h.01" />
-    </svg>
-  );
-}
-
-function SkipIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <path d="M5 4l10 8-10 8V4zM19 5v14" />
     </svg>
   );
 }

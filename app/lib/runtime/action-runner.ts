@@ -6,6 +6,7 @@ import { createScopedLogger } from '~/utils/logger';
 import { unreachable } from '~/utils/unreachable';
 import type { ActionCallbackData } from './message-parser';
 import type { BoltShell } from '~/utils/shell';
+import { sanitizeShellCommand, isValidShellCommand } from '~/utils/planSanitization';
 
 const logger = createScopedLogger('ActionRunner');
 
@@ -258,6 +259,26 @@ export class ActionRunner {
     if (!shell || !shell.terminal || !shell.process) {
       unreachable('Shell terminal not found');
     }
+
+    // First, sanitize the command to remove any XML/HTML tags that might have leaked through
+    let cleanedCommand = action.content;
+
+    if (!isValidShellCommand(action.content)) {
+      logger.debug(`Command contains XML-like patterns, sanitizing: ${action.content.substring(0, 100)}...`);
+      cleanedCommand = sanitizeShellCommand(action.content);
+      logger.debug(`Sanitized command: ${cleanedCommand}`);
+
+      // If after sanitization the command is still invalid or empty, skip execution
+      if (!cleanedCommand || !isValidShellCommand(cleanedCommand)) {
+        logger.warn('Command could not be sanitized to a valid shell command, skipping execution');
+        throw new ActionCommandError(
+          'Invalid Shell Command',
+          `The command contains invalid XML-like syntax that could not be parsed.\n\nOriginal command: ${action.content.substring(0, 200)}...`,
+        );
+      }
+    }
+
+    action.content = cleanedCommand;
 
     // Pre-validate command for common issues
     const validationResult = await this.#validateShellCommand(action.content);

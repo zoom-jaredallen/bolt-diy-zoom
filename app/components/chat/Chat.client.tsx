@@ -116,7 +116,6 @@ export const ChatImpl = memo(
     const { showChat } = useStore(chatStore);
     const [animationScope, animate] = useAnimate();
     const [apiKeys, setApiKeys] = useState<Record<string, string>>({});
-    const [chatMode, setChatMode] = useState<'discuss' | 'build'>('build');
     const [selectedElement, setSelectedElement] = useState<ElementInfo | null>(null);
     const mcpSettings = useMCPStore((state) => state.settings);
     const planState = useStore(planStore);
@@ -145,7 +144,7 @@ export const ChatImpl = memo(
         files,
         promptId,
         contextOptimization: contextOptimizationEnabled,
-        chatMode,
+        chatMode: 'build', // Always use build mode - Plan mode handles planning
         designScheme,
         supabase: {
           isConnected: supabaseConn.isConnected,
@@ -691,8 +690,6 @@ export const ChatImpl = memo(
         llmErrorAlert={llmErrorAlert}
         clearLlmErrorAlert={clearApiErrorAlert}
         data={chatData}
-        chatMode={chatMode}
-        setChatMode={setChatMode}
         append={append}
         designScheme={designScheme}
         setDesignScheme={setDesignScheme}

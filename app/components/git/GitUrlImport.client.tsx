@@ -12,6 +12,7 @@ import { webcontainer } from '~/lib/webcontainer';
 import { createCommandsMessage, detectProjectCommands, escapeBoltTags } from '~/utils/projectCommands';
 import { LoadingOverlay } from '~/components/ui/LoadingOverlay';
 import { toast } from 'react-toastify';
+import { setAutoApprove } from '~/lib/stores/pendingChanges';
 
 const IGNORE_PATTERNS = [
   'node_modules/**',
@@ -54,6 +55,9 @@ export function GitUrlImport() {
 
     if (repoUrl) {
       const ig = ignore().add(IGNORE_PATTERNS);
+
+      // Enable auto-approve for template imports to avoid multiple approval dialogs
+      setAutoApprove(true);
 
       try {
         const { workdir, data } = await gitClone(repoUrl);
@@ -131,11 +135,17 @@ ${escapeBoltTags(file.content)}
           }
 
           await importChat(`Git Project:${repoUrl.split('/').slice(-1)[0]}`, messages, { gitUrl: repoUrl });
+
+          // Reset auto-approve after successful import
+          setAutoApprove(false);
         }
       } catch (error) {
         console.error('Error during import:', error);
         toast.error('Failed to import repository');
         setLoading(false);
+
+        // Reset auto-approve on error
+        setAutoApprove(false);
         window.location.href = '/';
 
         return;

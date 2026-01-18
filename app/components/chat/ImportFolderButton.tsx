@@ -6,6 +6,7 @@ import { createChatFromFolder } from '~/utils/folderImport';
 import { logStore } from '~/lib/stores/logs'; // Assuming logStore is imported from this location
 import { Button } from '~/components/ui/Button';
 import { classNames } from '~/utils/classNames';
+import { setAutoApprove } from '~/lib/stores/pendingChanges';
 
 interface ImportFolderButtonProps {
   className?: string;
@@ -48,6 +49,9 @@ export const ImportFolderButton: React.FC<ImportFolderButtonProps> = ({ classNam
 
     const folderName = filteredFiles[0]?.webkitRelativePath.split('/')[0] || 'Unknown Folder';
     setIsLoading(true);
+
+    // Enable auto-approve for folder imports to avoid multiple approval dialogs
+    setAutoApprove(true);
 
     const loadingToast = toast.loading(`Importing ${folderName}...`);
 
@@ -100,6 +104,9 @@ export const ImportFolderButton: React.FC<ImportFolderButtonProps> = ({ classNam
       setIsLoading(false);
       toast.dismiss(loadingToast);
       e.target.value = ''; // Reset file input
+
+      // Reset auto-approve after import completes
+      setAutoApprove(false);
     }
   };
 
