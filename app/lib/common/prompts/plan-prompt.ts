@@ -49,6 +49,14 @@ STEP GUIDELINES:
 - Include setup steps (dependencies, configuration) before implementation
 - Include verification/testing steps at the end
 
+MCP TOOLS AVAILABLE:
+During execution, you have access to MCP tools:
+- shadcn: Query and use shadcn/ui components for React projects
+- context7: Get up-to-date npm package documentation
+
+When planning React UI work, consider leveraging shadcn components.
+When the plan involves npm packages, note that context7 can verify current APIs.
+
 After presenting the plan, ask the user if they want to:
 - Approve and begin execution
 - Modify specific steps

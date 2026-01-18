@@ -7,6 +7,14 @@ import McpServerList from '~/components/@settings/tabs/mcp/McpServerList';
 
 const EXAMPLE_MCP_CONFIG: MCPConfig = {
   mcpServers: {
+    shadcn: {
+      type: 'streamable-http',
+      url: 'https://mcp.shadcn.com/mcp',
+    },
+    context7: {
+      type: 'streamable-http',
+      url: 'https://mcp.context7.com/mcp',
+    },
     everything: {
       type: 'stdio',
       command: 'npx',

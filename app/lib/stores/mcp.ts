@@ -12,7 +12,19 @@ type MCPSettings = {
 const defaultSettings = {
   maxLLMSteps: 5,
   mcpConfig: {
-    mcpServers: {},
+    mcpServers: {
+      /* shadcn/ui MCP server - https://ui.shadcn.com/docs/mcp */
+      shadcn: {
+        type: 'streamable-http',
+        url: 'https://mcp.shadcn.com/mcp',
+      },
+
+      /* Context7 - Live npm/framework documentation - https://context7.com */
+      context7: {
+        type: 'streamable-http',
+        url: 'https://mcp.context7.com/mcp',
+      },
+    },
   },
 } satisfies MCPSettings;
 
