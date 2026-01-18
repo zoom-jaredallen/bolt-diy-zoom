@@ -24,6 +24,11 @@ FROM node:22-bookworm AS runtime
 WORKDIR /app
 
 RUN corepack enable && corepack prepare pnpm@9.14.4 --activate
+
+# Pre-install MCP servers globally for containerized deployments
+# This avoids npx downloading packages at runtime which fails in containers
+RUN npm install -g shadcn@latest @upstash/context7-mcp
+
 COPY --from=build /app /app
 
 RUN cat >/usr/local/bin/docker-entrypoint.sh <<'EOF'

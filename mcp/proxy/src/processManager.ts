@@ -64,13 +64,22 @@ export class ProcessManager {
     try {
       console.log(`[ProcessManager] Spawning ${serverName}: ${config.command} ${config.args?.join(' ') || ''}`);
 
+      // Merge custom env with process.env (custom env takes precedence)
+      // This ensures child processes have PATH, HOME, NODE_PATH etc. plus any custom vars
+      const mergedEnv: Record<string, string> = {
+        ...Object.fromEntries(
+          Object.entries(process.env).filter((entry): entry is [string, string] => entry[1] !== undefined)
+        ),
+        ...config.env,
+      };
+
       // Create MCP client with stdio transport
       const client = await experimental_createMCPClient({
         transport: new Experimental_StdioMCPTransport({
           command: config.command,
           args: config.args,
           cwd: config.cwd,
-          env: config.env,
+          env: mergedEnv,
         }),
       });
 

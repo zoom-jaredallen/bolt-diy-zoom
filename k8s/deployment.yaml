@@ -65,6 +65,10 @@ spec:
           env:
             - name: MCP_PROXY_PORT
               value: "3100"
+          # Include secrets for MCP servers that need API keys (e.g., context7)
+          envFrom:
+            - secretRef:
+                name: zoomvibes-secrets
           resources:
             requests:
               cpu: "100m"

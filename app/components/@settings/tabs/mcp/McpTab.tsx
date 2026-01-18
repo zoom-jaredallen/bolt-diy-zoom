@@ -9,12 +9,13 @@ const EXAMPLE_MCP_CONFIG: MCPConfig = {
   mcpServers: {
     shadcn: {
       type: 'stdio',
-      command: 'npx',
-      args: ['shadcn@latest', 'mcp'],
+      command: 'shadcn',
+      args: ['mcp'],
     },
     context7: {
-      type: 'streamable-http',
-      url: 'https://mcp.context7.com/mcp',
+      type: 'stdio',
+      command: 'context7-mcp',
+      args: [],
     },
     'zoom-api': {
       type: 'streamable-http',

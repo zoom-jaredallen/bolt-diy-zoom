@@ -24,9 +24,16 @@ const logger = createScopedLogger('mcp-service');
 const MCP_PROXY_URL = process.env.MCP_PROXY_URL || 'http://localhost:3100';
 let _proxyAvailable: boolean | null = null;
 
-// Server-specific API key injection
+// Server-specific API key injection for HTTP servers (via headers)
 const MCP_SERVER_API_KEYS: Record<string, string | undefined> = {
   context7: process.env.CONTEXT7_API_KEY,
+};
+
+// Server-specific environment variables for stdio servers
+const MCP_SERVER_ENV_VARS: Record<string, Record<string, string | undefined>> = {
+  context7: {
+    CONTEXT7_API_KEY: process.env.CONTEXT7_API_KEY,
+  },
 };
 
 /**
@@ -271,6 +278,19 @@ export class MCPService {
    * This allows stdio servers to work in browser/Cloudflare environments
    */
   private async _createProxyStdioClient(serverName: string, config: STDIOServerConfig): Promise<MCPClient> {
+    // Merge server-specific environment variables with config env
+    const serverEnvVars = MCP_SERVER_ENV_VARS[serverName] || {};
+    const mergedEnv: Record<string, string> = {
+      ...config.env,
+    };
+
+    // Only add env vars that have actual values (not undefined)
+    for (const [key, value] of Object.entries(serverEnvVars)) {
+      if (value) {
+        mergedEnv[key] = value;
+      }
+    }
+
     // Spawn the server via proxy
     const spawnResponse = await fetch(`${MCP_PROXY_URL}/api/spawn`, {
       method: 'POST',
@@ -281,7 +301,7 @@ export class MCPService {
           command: config.command,
           args: config.args || [],
           cwd: config.cwd,
-          env: config.env,
+          env: Object.keys(mergedEnv).length > 0 ? mergedEnv : undefined,
         },
       }),
     });

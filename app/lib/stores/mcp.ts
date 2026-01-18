@@ -3,7 +3,7 @@ import type { MCPConfig, MCPServerTools } from '~/lib/services/mcpService';
 
 const MCP_SETTINGS_KEY = 'mcp_settings';
 const MCP_CONFIG_VERSION_KEY = 'mcp_config_version';
-const CURRENT_CONFIG_VERSION = 2; // Increment when adding new default servers
+const CURRENT_CONFIG_VERSION = 4; // Increment when adding new default servers (v4: context7 uses global stdio install)
 const isBrowser = typeof window !== 'undefined';
 
 type MCPSettings = {
@@ -16,17 +16,25 @@ type MCPSettings = {
  * When adding new default servers, increment CURRENT_CONFIG_VERSION above.
  */
 const defaultMCPServers = {
-  /* shadcn/ui MCP server - https://ui.shadcn.com/docs/mcp */
+  /*
+   * shadcn/ui MCP server - https://ui.shadcn.com/docs/mcp
+   * Uses globally installed shadcn for container compatibility
+   * (npx downloads at runtime which fails in containerized environments)
+   */
   shadcn: {
     type: 'stdio' as const,
-    command: 'npx',
-    args: ['shadcn@latest', 'mcp'],
+    command: 'shadcn',
+    args: ['mcp'],
   },
 
-  /* Context7 - Live npm/framework documentation - https://context7.com */
+  /*
+   * Context7 - Live npm/framework documentation - https://context7.com
+   * Uses globally installed @upstash/context7-mcp for container compatibility
+   */
   context7: {
-    type: 'streamable-http' as const,
-    url: 'https://mcp.context7.com/mcp',
+    type: 'stdio' as const,
+    command: 'context7-mcp',
+    args: [],
   },
 
   /*
@@ -45,17 +53,24 @@ const defaultSettings = {
   maxLLMSteps: 5,
   mcpConfig: {
     mcpServers: {
-      /* shadcn/ui MCP server - https://ui.shadcn.com/docs/mcp */
+      /*
+       * shadcn/ui MCP server - https://ui.shadcn.com/docs/mcp
+       * Uses globally installed shadcn for container compatibility
+       */
       shadcn: {
         type: 'stdio',
-        command: 'npx',
-        args: ['shadcn@latest', 'mcp'],
+        command: 'shadcn',
+        args: ['mcp'],
       },
 
-      /* Context7 - Live npm/framework documentation - https://context7.com */
+      /*
+       * Context7 - Live npm/framework documentation - https://context7.com
+       * Uses globally installed @upstash/context7-mcp for container compatibility
+       */
       context7: {
-        type: 'streamable-http',
-        url: 'https://mcp.context7.com/mcp',
+        type: 'stdio',
+        command: 'context7-mcp',
+        args: [],
       },
 
       /*
