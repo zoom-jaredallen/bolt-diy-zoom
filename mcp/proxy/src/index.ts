@@ -1,5 +1,6 @@
 import { app } from './server.js';
 import { processManager } from './processManager.js';
+import { initializeZoomApiAdapter, isZoomApiAvailable } from './zoomApiAdapter.js';
 
 const PORT = process.env.MCP_PROXY_PORT || 3100;
 
@@ -13,23 +14,38 @@ async function shutdown() {
 process.on('SIGINT', shutdown);
 process.on('SIGTERM', shutdown);
 
-// Start server
-app.listen(PORT, () => {
-  console.log('============================================================');
-  console.log('  MCP Proxy Server');
-  console.log('============================================================');
-  console.log(`  Port: ${PORT}`);
-  console.log(`  Health: http://localhost:${PORT}/health`);
-  console.log('');
-  console.log('  Endpoints:');
-  console.log('    POST   /api/spawn             - Start a stdio MCP server');
-  console.log('    GET    /api/sessions          - List active sessions');
-  console.log('    GET    /api/tools/:sessionId  - Get tools for session');
-  console.log('    GET    /api/tools/server/:name - Get tools by server name');
-  console.log('    POST   /api/execute/:sessionId - Execute tool');
-  console.log('    POST   /api/execute/server/:name - Execute tool by server');
-  console.log('    DELETE /api/close/:sessionId  - Close session');
-  console.log('    DELETE /api/close/server/:name - Close by server name');
-  console.log('============================================================');
-  console.log('');
+// Initialize and start server
+async function main() {
+  // Initialize built-in servers
+  await initializeZoomApiAdapter();
+
+  // Start server
+  app.listen(PORT, () => {
+    console.log('============================================================');
+    console.log('  MCP Proxy Server');
+    console.log('============================================================');
+    console.log(`  Port: ${PORT}`);
+    console.log(`  Health: http://localhost:${PORT}/health`);
+    console.log('');
+    console.log('  Stdio Proxy Endpoints:');
+    console.log('    POST   /api/spawn              - Start a stdio MCP server');
+    console.log('    GET    /api/sessions           - List active sessions');
+    console.log('    GET    /api/tools/:sessionId   - Get tools for session');
+    console.log('    POST   /api/execute/:sessionId - Execute tool');
+    console.log('    DELETE /api/close/:sessionId   - Close session');
+    console.log('');
+    console.log('  Built-in MCP Servers:');
+    console.log(`    Zoom API: ${isZoomApiAvailable() ? '✓ Available' : '✗ Not available'}`);
+    console.log('    GET  /mcp/zoom-api/tools     - List Zoom API tools');
+    console.log('    POST /mcp/zoom-api/execute   - Execute Zoom API tool');
+    console.log('    GET  /mcp/zoom-api/categories - List API categories');
+    console.log('    GET  /mcp/zoom-api/search?q=  - Search endpoints');
+    console.log('============================================================');
+    console.log('');
+  });
+}
+
+main().catch((error) => {
+  console.error('[MCP Proxy] Failed to start:', error);
+  process.exit(1);
 });

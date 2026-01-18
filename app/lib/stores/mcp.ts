@@ -32,10 +32,12 @@ const defaultMCPServers = {
   /*
    * Zoom API - Zoom API endpoint documentation and discovery
    * Provides tools: zoom_list_categories, zoom_search_endpoints, zoom_get_endpoint, zoom_get_scopes
+   * Served by the MCP Proxy sidecar (localhost:3100) when running in Kubernetes
+   * Falls back to external URL if MCP_PROXY_URL is not set
    */
   'zoom-api': {
     type: 'streamable-http' as const,
-    url: 'https://zoomvibes.j4red4llen.com/mcp/zoom-api',
+    url: 'http://localhost:3100/mcp/zoom-api',
   },
 };
 
@@ -59,12 +61,11 @@ const defaultSettings = {
       /*
        * Zoom API - Zoom API endpoint documentation and discovery
        * Provides tools: zoom_list_categories, zoom_search_endpoints, zoom_get_endpoint, zoom_get_scopes
-       * For local development, use stdio config instead:
-       * 'zoom-api': { type: 'stdio', command: 'node', args: ['./mcp/zoom-api/dist/index.js'] }
+       * Served by the MCP Proxy sidecar (localhost:3100) when running in Kubernetes
        */
       'zoom-api': {
         type: 'streamable-http',
-        url: 'https://zoomvibes.j4red4llen.com/mcp/zoom-api',
+        url: 'http://localhost:3100/mcp/zoom-api',
       },
     },
   },

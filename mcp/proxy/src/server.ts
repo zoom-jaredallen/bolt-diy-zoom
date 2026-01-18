@@ -1,6 +1,7 @@
 import express, { type Request, type Response, type NextFunction } from 'express';
 import cors from 'cors';
 import { processManager } from './processManager.js';
+import { createZoomApiRouter, isZoomApiAvailable } from './zoomApiAdapter.js';
 import {
   spawnRequestSchema,
   executeRequestSchema,
@@ -29,13 +30,20 @@ app.use((req: Request, _res: Response, next: NextFunction) => {
 /**
  * Health check endpoint
  */
-app.get('/health', (_req: Request, res: Response<HealthResponse>) => {
+app.get('/health', (_req: Request, res: Response<HealthResponse & { zoomApiAvailable?: boolean }>) => {
   res.json({
     status: 'ok',
     activeSessions: processManager.getActiveSessionCount(),
     uptime: Math.floor((Date.now() - startTime) / 1000),
+    zoomApiAvailable: isZoomApiAvailable(),
   });
 });
+
+/**
+ * Mount Zoom API router at /mcp/zoom-api
+ * This provides built-in Zoom API documentation tools
+ */
+app.use('/mcp/zoom-api', createZoomApiRouter());
 
 /**
  * List all active sessions
