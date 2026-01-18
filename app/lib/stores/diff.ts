@@ -16,7 +16,7 @@ export interface DiffState {
 }
 
 export const diffState = map<DiffState>({
-  isEnabled: true,
+  isEnabled: false, // Disabled by default - can be enabled in settings
   showDiffModal: false,
   autoApproveSmallChanges: false,
   smallChangeThreshold: 10,
