@@ -1,7 +1,11 @@
 import { useState, useCallback } from 'react';
 import { useStore } from '@nanostores/react';
+import { toast } from 'react-toastify';
 import { workbenchStore } from '~/lib/stores/workbench';
 import { DeployButton } from '~/components/deploy/DeployButton';
+import { chatId, db } from '~/lib/persistence';
+import { setSnapshot } from '~/lib/persistence/db';
+import type { Snapshot } from '~/lib/persistence/types';
 
 interface HeaderActionButtonsProps {
   chatStarted: boolean;
@@ -10,10 +14,50 @@ interface HeaderActionButtonsProps {
 export function HeaderActionButtons({ chatStarted: _chatStarted }: HeaderActionButtonsProps) {
   const [activePreviewIndex] = useState(0);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [isSavingSnapshot, setIsSavingSnapshot] = useState(false);
   const previews = useStore(workbenchStore.previews);
   const activePreview = previews[activePreviewIndex];
 
   const shouldShowButtons = activePreview;
+
+  const handleSaveSnapshot = useCallback(async () => {
+    const currentChatId = chatId.get();
+
+    if (!currentChatId) {
+      toast.error('Cannot save snapshot: No chat ID. Start a conversation first.');
+      return;
+    }
+
+    if (!db) {
+      toast.error('Cannot save snapshot: Database not available.');
+      return;
+    }
+
+    const files = workbenchStore.files.get();
+
+    if (Object.keys(files).length === 0) {
+      toast.error('Cannot save snapshot: No files in project.');
+      return;
+    }
+
+    setIsSavingSnapshot(true);
+
+    try {
+      const snapshot: Snapshot = {
+        chatIndex: '', // Will be updated on next message
+        files,
+      };
+
+      await setSnapshot(db, currentChatId, snapshot);
+      toast.success(`Snapshot saved! ${Object.keys(files).length} files saved for this project.`);
+      console.log('[SaveSnapshot] SUCCESS - saved', Object.keys(files).length, 'files for chat:', currentChatId);
+    } catch (error) {
+      console.error('[SaveSnapshot] FAILED:', error);
+      toast.error('Failed to save snapshot.');
+    } finally {
+      setIsSavingSnapshot(false);
+    }
+  }, []);
 
   const handleLogout = useCallback(async () => {
     setIsLoggingOut(true);
@@ -73,6 +117,19 @@ export function HeaderActionButtons({ chatStarted: _chatStarted }: HeaderActionB
             <span>Debug Log</span>
           </button>
         </div>
+      )}
+
+      {/* Save Snapshot Button */}
+      {shouldShowButtons && (
+        <button
+          onClick={handleSaveSnapshot}
+          disabled={isSavingSnapshot}
+          className="flex items-center justify-center px-3 py-1.5 text-xs border border-bolt-elements-borderColor rounded-md bg-bolt-elements-background-depth-2 text-bolt-elements-textSecondary hover:bg-bolt-elements-background-depth-3 hover:text-bolt-elements-textPrimary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          title="Save project snapshot for restoring later"
+        >
+          <div className="i-ph:camera mr-1.5" />
+          <span>{isSavingSnapshot ? 'Saving...' : 'Save Snapshot'}</span>
+        </button>
       )}
 
       {/* Logout Button */}

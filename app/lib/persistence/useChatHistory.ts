@@ -199,9 +199,19 @@ ${value.content}
 
   const takeSnapshot = useCallback(
     async (chatIdx: string, files: FileMap, _chatId?: string | undefined, chatSummary?: string) => {
-      const id = chatId.get();
+      // Use provided chatId or fall back to global chatId
+      const id = _chatId || chatId.get();
+
+      console.log('[takeSnapshot] Called with chatIdx:', chatIdx, 'files count:', Object.keys(files).length);
+      console.log('[takeSnapshot] Using chatId:', id, '(from param:', _chatId, 'from atom:', chatId.get(), ')');
 
       if (!id || !db) {
+        console.warn('[takeSnapshot] SKIPPING - no chat ID or DB. id:', id, 'db:', !!db);
+        return;
+      }
+
+      if (Object.keys(files).length === 0) {
+        console.warn('[takeSnapshot] SKIPPING - no files to save');
         return;
       }
 
@@ -211,11 +221,13 @@ ${value.content}
         summary: chatSummary,
       };
 
-      // localStorage.setItem(`snapshot:${id}`, JSON.stringify(snapshot)); // Remove localStorage usage
+      console.log('[takeSnapshot] Saving snapshot with', Object.keys(files).length, 'files to chat:', id);
+
       try {
         await setSnapshot(db, id, snapshot);
+        console.log('[takeSnapshot] SUCCESS - snapshot saved for chat:', id);
       } catch (error) {
-        console.error('Failed to save snapshot:', error);
+        console.error('[takeSnapshot] FAILED to save snapshot:', error);
         toast.error('Failed to save chat snapshot.');
       }
     },
@@ -279,17 +291,38 @@ ${value.content}
         return;
       }
 
+      console.log('[storeMessageHistory] Starting with', messages.length, 'messages');
+
       const { firstArtifact } = workbenchStore;
       messages = messages.filter((m) => !m.annotations?.includes('no-store'));
 
       let _urlId = urlId;
 
       if (!urlId && firstArtifact?.id) {
-        const urlId = await getUrlId(db, firstArtifact.id);
-        _urlId = urlId;
-        navigateChat(urlId);
-        setUrlId(urlId);
+        const newUrlId = await getUrlId(db, firstArtifact.id);
+        _urlId = newUrlId;
+        navigateChat(newUrlId);
+        setUrlId(newUrlId);
       }
+
+      /*
+       * IMPORTANT: Ensure chatId is set BEFORE takeSnapshot is called.
+       * For new chats, we need to generate the ID first.
+       */
+      let currentChatId = chatId.get();
+
+      if (initialMessages.length === 0 && !currentChatId) {
+        const nextId = await getNextId(db);
+        chatId.set(nextId);
+        currentChatId = nextId;
+        console.log('[storeMessageHistory] Generated new chatId:', currentChatId);
+
+        if (!urlId) {
+          navigateChat(nextId);
+        }
+      }
+
+      console.log('[storeMessageHistory] ChatId before snapshot:', currentChatId);
 
       let chatSummary: string | undefined = undefined;
       const lastMessage = messages[messages.length - 1];
@@ -306,28 +339,20 @@ ${value.content}
         }
       }
 
-      takeSnapshot(messages[messages.length - 1].id, workbenchStore.files.get(), _urlId, chatSummary);
-
       if (!description.get() && firstArtifact?.title) {
         description.set(firstArtifact?.title);
       }
 
-      // Ensure chatId.get() is used here as well
-      if (initialMessages.length === 0 && !chatId.get()) {
-        const nextId = await getNextId(db);
-
-        chatId.set(nextId);
-
-        if (!urlId) {
-          navigateChat(nextId);
-        }
-      }
+      // NOW call takeSnapshot with the confirmed chatId
+      const filesCount = Object.keys(workbenchStore.files.get()).length;
+      console.log('[storeMessageHistory] About to takeSnapshot with chatId:', currentChatId, 'files:', filesCount);
+      takeSnapshot(messages[messages.length - 1].id, workbenchStore.files.get(), currentChatId, chatSummary);
 
       // Ensure chatId.get() is used for the final setMessages call
       const finalChatId = chatId.get();
 
       if (!finalChatId) {
-        console.error('Cannot save messages, chat ID is not set.');
+        console.error('[storeMessageHistory] Cannot save messages, chat ID is not set.');
         toast.error('Failed to save chat messages: Chat ID missing.');
 
         return;
@@ -335,13 +360,15 @@ ${value.content}
 
       await setMessages(
         db,
-        finalChatId, // Use the potentially updated chatId
+        finalChatId,
         [...archivedMessages, ...messages],
-        urlId,
+        _urlId,
         description.get(),
         undefined,
         chatMetadata.get(),
       );
+
+      console.log('[storeMessageHistory] Messages saved for chat:', finalChatId);
     },
     duplicateCurrentChat: async (listItemId: string) => {
       if (!db || (!mixedId && !listItemId)) {
