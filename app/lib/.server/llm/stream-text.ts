@@ -284,6 +284,33 @@ export async function streamText(props: {
   if (props.planMode === 'plan') {
     logger.info('PLAN MODE ACTIVE - Using plan-only system prompt');
     effectiveSystemPrompt = PLAN_MODE_SYSTEM_PROMPT;
+
+    /*
+     * CRITICAL: Reinforce plan-only instructions in the last user message.
+     * This helps ensure the LLM doesn't generate <boltArtifact> tags in Plan mode.
+     * LLMs pay more attention to instructions at the end of messages.
+     */
+    const planModeReinforcement = `
+
+[IMPORTANT: PLAN MODE ACTIVE]
+You are in PLAN MODE. You MUST:
+1. Analyze this request and create a structured execution plan
+2. Output ONLY a JSON plan (in a code block) with title, summary, steps
+3. DO NOT generate any code or create any files
+4. DO NOT use <boltArtifact> or <boltAction> tags
+5. After the plan, ask if the user wants to approve, modify, or get more details
+
+Remember: NO CODE, NO FILES, ONLY A PLAN.`;
+
+    const lastUserMessageIndex = processedMessages.findLastIndex((m) => m.role === 'user');
+
+    if (lastUserMessageIndex >= 0) {
+      processedMessages[lastUserMessageIndex] = {
+        ...processedMessages[lastUserMessageIndex],
+        content: processedMessages[lastUserMessageIndex].content + planModeReinforcement,
+      };
+      logger.debug('Plan mode reinforcement added to last user message');
+    }
   } else if (props.planMode === 'act' && props.currentPlan) {
     // In Act mode with an active plan, add step context
     const stepIndex = props.currentStepIndex ?? 0;
