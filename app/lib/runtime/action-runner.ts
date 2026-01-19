@@ -118,6 +118,37 @@ export class ActionRunner {
     });
   }
 
+  /**
+   * Add an action and immediately mark it as complete.
+   * Used for reloaded messages where we don't want to re-execute the action
+   * (e.g., file actions when files are restored from snapshot).
+   */
+  addActionAsComplete(data: ActionCallbackData) {
+    const { actionId } = data;
+
+    const actions = this.actions.get();
+    const action = actions[actionId];
+
+    if (action) {
+      // action already added
+      return;
+    }
+
+    const abortController = new AbortController();
+
+    this.actions.setKey(actionId, {
+      ...data.action,
+      status: 'complete', // Already done
+      executed: true, // Already executed
+      abort: () => {
+        // No-op: action already complete
+      },
+      abortSignal: abortController.signal,
+    });
+
+    logger.debug('Action added as complete (from reloaded message):', actionId);
+  }
+
   async runAction(data: ActionCallbackData, isStreaming: boolean = false) {
     const { actionId } = data;
     const action = this.actions.get()[actionId];

@@ -533,12 +533,24 @@ export class WorkbenchStore {
     this.addToExecutionQueue(() => this._addAction(data));
   }
   async _addAction(data: ActionCallbackData) {
-    const { artifactId } = data;
+    const { artifactId, messageId } = data;
 
     const artifact = this.#getArtifact(artifactId);
 
     if (!artifact) {
       unreachable('Artifact not found');
+    }
+
+    /*
+     * For reloaded messages, mark FILE actions as already complete.
+     * Files are restored from the snapshot, so we don't need to re-create them.
+     * This prevents the spinning "Creating..." indicators in the UI.
+     * Shell and start actions are still added normally so they can execute
+     * (npm install, npm run dev, etc.)
+     */
+    if (this.#reloadedMessages.has(messageId) && data.action.type === 'file') {
+      logger.debug('WorkbenchStore: Marking file action as complete for reloaded message:', messageId);
+      return artifact.runner.addActionAsComplete(data);
     }
 
     return artifact.runner.addAction(data);
