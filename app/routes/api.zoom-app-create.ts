@@ -28,10 +28,8 @@
 
 import { type ActionFunctionArgs, json } from '@remix-run/cloudflare';
 import {
-  buildZoomAppCreateRequest,
-  createZoomAppWithRetry,
-  generateEnvFileContent,
-  generateProxyOAuthUrl,
+  createZoomAppWithProject,
+  generateEnvFileContentWithProject,
   ZoomMarketplaceError,
   ZOOM_APP_DEFAULTS,
   type ZoomCredentials,
@@ -110,8 +108,13 @@ export async function action({ request, context }: ActionFunctionArgs) {
 
     const trimmedAppName = appName.trim();
 
-    // Build the app creation request
-    const createRequest = buildZoomAppCreateRequest({
+    console.log('[ZoomAppCreate] Creating Zoom App with project registration:', trimmedAppName);
+
+    /*
+     * Create the app with automatic project registration.
+     * This stores credentials securely on the server and creates a project-specific callback URL.
+     */
+    const result = await createZoomAppWithProject(credentials, {
       appName: trimmedAppName,
       previewId,
       scopes,
@@ -119,37 +122,39 @@ export async function action({ request, context }: ActionFunctionArgs) {
       longDescription,
     });
 
-    console.log('[ZoomAppCreate] Creating Zoom App:', trimmedAppName);
-
-    // Create the app with retry logic
-    const result = await createZoomAppWithRetry(credentials, createRequest);
-
-    // Generate .env file content
-    const envContent = generateEnvFileContent(result, trimmedAppName);
-
-    // Generate a proper OAuth URL that goes through our proxy (includes state parameter)
-    const proxyOAuthUrl = generateProxyOAuthUrl(result.credentials, result.app_id, trimmedAppName);
+    // Generate .env file content (secure version - no client secret exposed)
+    const envContent = generateEnvFileContentWithProject(result, trimmedAppName);
 
     console.log('[ZoomAppCreate] Zoom App created successfully:', result.app_id);
-    console.log('[ZoomAppCreate] envContent generated, length:', envContent.length);
-    console.log('[ZoomAppCreate] envContent preview:', envContent.substring(0, 200));
-    console.log('[ZoomAppCreate] Proxy OAuth URL:', proxyOAuthUrl);
+    console.log('[ZoomAppCreate] Project ID:', result.projectId);
+    console.log('[ZoomAppCreate] Redirect URI:', result.redirectUri);
+    console.log('[ZoomAppCreate] Token Polling URL:', result.tokenPollingUrl);
 
     return json({
       success: true,
       appId: result.app_id,
       appName: trimmedAppName,
+      projectId: result.projectId,
 
-      // Return the proxy URL (with state handling) instead of direct Zoom URL
-      oauthAuthorizeUrl: proxyOAuthUrl,
+      // The redirect URI is now project-specific and works with Marketplace "Add" button
+      redirectUri: result.redirectUri,
 
-      // Also include the direct URL for reference
+      // Token polling URL for the app to retrieve tokens after OAuth
+      tokenPollingUrl: result.tokenPollingUrl,
+
+      // Direct Zoom OAuth URL (for reference)
       directOAuthUrl: result.oauth_authorize_url,
+
+      // Only expose the client ID (public), not the secret
       credentials: {
         clientId: result.credentials.client_id,
-        clientSecret: result.credentials.client_secret,
       },
+
+      // Environment file content (safe to include in WebContainer)
       envContent,
+
+      // Marketplace management URL
+      marketplaceUrl: `https://marketplace.zoom.us/develop/apps/${result.app_id}`,
     });
   } catch (error) {
     console.error('[ZoomAppCreate] Error creating Zoom App:', error);

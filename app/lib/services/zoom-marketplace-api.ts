@@ -140,6 +140,8 @@ interface TokenCache {
 // In-memory token cache (1 hour TTL)
 let tokenCache: TokenCache | null = null;
 
+import { generateProjectId, storeProjectCredentials, getProjectRedirectUri } from '~/lib/services/project-store';
+
 /**
  * Default values for Zoom App creation
  */
@@ -373,6 +375,7 @@ export function buildZoomAppManifest(options: {
   previewId?: string;
   products?: ZoomProduct[];
   zoomAppApis?: string[];
+  projectId?: string; // Optional: for project-specific redirect URI
 }): ZoomAppManifest {
   const {
     appName,
@@ -382,6 +385,7 @@ export function buildZoomAppManifest(options: {
     previewId,
     products = ZOOM_APP_DEFAULTS.default_products,
     zoomAppApis = ZOOM_APP_DEFAULTS.default_zoom_app_apis,
+    projectId,
   } = options;
 
   // Build home URI using the WebContainer preview URL if previewId provided
@@ -395,6 +399,11 @@ export function buildZoomAppManifest(options: {
     optional: false,
   }));
 
+  // Use project-specific redirect URI if projectId is provided
+  const redirectUri = projectId
+    ? getProjectRedirectUri(projectId, ZOOM_APP_DEFAULTS.base_url)
+    : ZOOM_APP_DEFAULTS.oauth_callback_url;
+
   return {
     display_information: {
       display_name: appName,
@@ -403,8 +412,8 @@ export function buildZoomAppManifest(options: {
     },
     oauth_information: {
       usage: 'USER_OPERATION',
-      development_redirect_uri: ZOOM_APP_DEFAULTS.oauth_callback_url,
-      production_redirect_uri: ZOOM_APP_DEFAULTS.oauth_callback_url,
+      development_redirect_uri: redirectUri,
+      production_redirect_uri: redirectUri,
       oauth_allow_list: [ZOOM_APP_DEFAULTS.base_url],
       strict_mode: false,
       subdomain_strict_mode: true,
@@ -453,6 +462,7 @@ export function buildZoomAppCreateRequest(options: {
   previewId?: string;
   products?: ZoomProduct[];
   zoomAppApis?: string[];
+  projectId?: string; // Optional: for project-specific redirect URI
 }): ZoomAppCreateRequest {
   const scopes = options.scopes || ZOOM_APP_DEFAULTS.default_scopes;
 
@@ -467,6 +477,138 @@ export function buildZoomAppCreateRequest(options: {
     publish: false,
     manifest: buildZoomAppManifest(options),
   };
+}
+
+/**
+ * Extended response with project information
+ */
+export interface ZoomAppCreateWithProjectResponse extends ZoomAppCreateResponse {
+  projectId: string;
+  redirectUri: string;
+  tokenPollingUrl: string;
+}
+
+/**
+ * Create a Zoom App with automatic project registration
+ *
+ * This function:
+ * 1. Generates a unique project ID
+ * 2. Creates the Zoom App with project-specific redirect URI
+ * 3. Stores the credentials in the project store
+ * 4. Returns extended response with project details
+ *
+ * This enables the Marketplace "Add" button to work automatically
+ * without requiring credentials in environment variables.
+ *
+ * @param credentials - Zoom S2S OAuth credentials
+ * @param options - App creation options
+ * @returns Created app details with project information
+ */
+export async function createZoomAppWithProject(
+  credentials: ZoomCredentials,
+  options: {
+    appName: string;
+    description?: string;
+    longDescription?: string;
+    scopes?: string[];
+    previewId?: string;
+  },
+): Promise<ZoomAppCreateWithProjectResponse> {
+  // Generate a unique project ID
+  const projectId = generateProjectId();
+
+  console.log(`[ZoomAPI] Creating Zoom App with project: ${projectId}`);
+
+  // Build request with project-specific redirect URI
+  const request = buildZoomAppCreateRequest({
+    ...options,
+    projectId,
+  });
+
+  // Create the app with retry logic
+  const result = await createZoomAppWithRetry(credentials, request);
+
+  // Store credentials in project store
+  await storeProjectCredentials({
+    projectId,
+    clientId: result.credentials.client_id,
+    clientSecret: result.credentials.client_secret,
+    appId: result.app_id,
+    appName: options.appName,
+  });
+
+  // Get the redirect URI for reference
+  const redirectUri = getProjectRedirectUri(projectId, ZOOM_APP_DEFAULTS.base_url);
+
+  // Build the token polling URL
+  const tokenPollingUrl = `${ZOOM_APP_DEFAULTS.base_url}/api/oauth/tokens/${projectId}`;
+
+  console.log(`[ZoomAPI] App created with project: ${projectId}`);
+  console.log(`[ZoomAPI] Redirect URI: ${redirectUri}`);
+  console.log(`[ZoomAPI] Token Polling URL: ${tokenPollingUrl}`);
+
+  return {
+    ...result,
+    projectId,
+    redirectUri,
+    tokenPollingUrl,
+  };
+}
+
+/**
+ * Generate .env file content with project-based credentials
+ *
+ * This version includes the projectId and token polling URL
+ * for automatic OAuth token retrieval.
+ *
+ * @param response - API response with credentials and project info
+ * @param appName - Name of the created app
+ * @returns String content for .env file
+ */
+export function generateEnvFileContentWithProject(response: ZoomAppCreateWithProjectResponse, appName: string): string {
+  console.log('[generateEnvFileContent] Generating .env content for app with project:', appName);
+
+  const content = `# ======================================
+# Zoom App Credentials
+# Auto-generated by Bolt.diy on ${new Date().toISOString()}
+# ======================================
+
+# App Information
+ZOOM_APP_ID=${response.app_id}
+ZOOM_APP_NAME=${appName}
+
+# Project Information (for OAuth flow)
+# The projectId is used to retrieve OAuth tokens after Marketplace authorization
+ZOOM_PROJECT_ID=${response.projectId}
+
+# Zoom App OAuth Credentials (Client ID is public, needed for client-side)
+VITE_ZOOM_CLIENT_ID=${response.credentials.client_id}
+
+# NOTE: Client secret is stored securely on the bolt.diy server
+# It is NOT included in this file for security reasons!
+# The OAuth flow is handled via the redirect URI below.
+
+# OAuth Configuration
+# This redirect URI is automatically handled by bolt.diy
+VITE_OAUTH_REDIRECT_URL=${response.redirectUri}
+
+# Token Polling URL
+# After OAuth authorization, poll this URL to retrieve tokens
+ZOOM_TOKEN_POLLING_URL=${response.tokenPollingUrl}
+
+# Zoom Marketplace
+# Manage your app at: https://marketplace.zoom.us/develop/apps/${response.app_id}
+# 
+# To authorize (Local Test):
+# 1. Go to the Marketplace link above
+# 2. Click "Local Test" tab
+# 3. Click "Add" to authorize the app
+# 4. Your app will automatically receive the OAuth tokens
+`;
+
+  console.log('[generateEnvFileContent] Generated content length:', content.length);
+
+  return content;
 }
 
 /**
