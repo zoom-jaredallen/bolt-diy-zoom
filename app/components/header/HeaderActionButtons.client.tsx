@@ -11,14 +11,17 @@ interface HeaderActionButtonsProps {
   chatStarted: boolean;
 }
 
-export function HeaderActionButtons({ chatStarted: _chatStarted }: HeaderActionButtonsProps) {
+export function HeaderActionButtons({ chatStarted }: HeaderActionButtonsProps) {
   const [activePreviewIndex] = useState(0);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [isSavingSnapshot, setIsSavingSnapshot] = useState(false);
   const previews = useStore(workbenchStore.previews);
+  const files = useStore(workbenchStore.files);
   const activePreview = previews[activePreviewIndex];
 
   const shouldShowButtons = activePreview;
+  const hasFiles = Object.keys(files).length > 0;
+  const shouldShowSnapshotButton = chatStarted || hasFiles;
 
   const handleSaveSnapshot = useCallback(async () => {
     const currentChatId = chatId.get();
@@ -119,8 +122,8 @@ export function HeaderActionButtons({ chatStarted: _chatStarted }: HeaderActionB
         </div>
       )}
 
-      {/* Save Snapshot Button */}
-      {shouldShowButtons && (
+      {/* Save Snapshot Button - shows when chat started or files exist (even without preview) */}
+      {shouldShowSnapshotButton && (
         <button
           onClick={handleSaveSnapshot}
           disabled={isSavingSnapshot}
