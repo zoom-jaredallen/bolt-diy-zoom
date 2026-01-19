@@ -567,6 +567,15 @@ export class WorkbenchStore {
   }
 
   runAction(data: ActionCallbackData, isStreaming: boolean = false) {
+    /*
+     * Skip execution for messages loaded from history (reloaded messages).
+     * This prevents re-executing actions that were already executed in a previous session.
+     */
+    if (this.#reloadedMessages.has(data.messageId)) {
+      logger.debug('WorkbenchStore: Skipping action for reloaded message:', data.messageId);
+      return;
+    }
+
     // SAFETY GUARD: Block actions in Plan mode until approved
     if (!this.#canExecuteAction()) {
       logger.info(`WorkbenchStore: Action queued but blocked (Plan mode): ${data.action.type}`);
