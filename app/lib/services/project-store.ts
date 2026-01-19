@@ -72,8 +72,7 @@ async function getEncryptionKey(): Promise<CryptoKey> {
   }
 
   // Get the encryption key from environment or generate a default for development
-  const keyMaterial =
-    process.env.PROJECT_STORE_ENCRYPTION_KEY || 'bolt-diy-development-key-do-not-use-in-production';
+  const keyMaterial = process.env.PROJECT_STORE_ENCRYPTION_KEY || 'bolt-diy-development-key-do-not-use-in-production';
 
   // Derive a 256-bit key using PBKDF2
   const encoder = new TextEncoder();
@@ -141,6 +140,7 @@ async function decryptData(encrypted: EncryptedData): Promise<string> {
   const decrypted = await webcrypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, combined);
 
   const decoder = new TextDecoder();
+
   return decoder.decode(decrypted);
 }
 
@@ -205,6 +205,7 @@ export async function getProjectCredentials(projectId: string): Promise<ProjectC
   if (stored.expiresAt && stored.expiresAt < Date.now()) {
     console.log(`[ProjectStore] Project credentials expired: ${projectId}`);
     memoryStore.projects.delete(projectId);
+
     return null;
   }
 
