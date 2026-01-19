@@ -141,6 +141,7 @@ interface TokenCache {
 let tokenCache: TokenCache | null = null;
 
 import { generateProjectId, storeProjectCredentials, getProjectRedirectUri } from '~/lib/services/project-store';
+import { registerZoomApp } from '~/lib/services/zoom-app-registry';
 
 /**
  * Default values for Zoom App creation
@@ -152,6 +153,9 @@ export const ZOOM_APP_DEFAULTS = {
   base_url: 'https://zoomvibes.j4red4llen.com',
   oauth_callback_url: 'https://zoomvibes.j4red4llen.com/api/oauth/proxy/callback',
   webcontainer_preview_base: 'https://zoomvibes.j4red4llen.com/webcontainer/preview',
+
+  // Dynamic home URL base - redirects to WebContainer preview when available
+  zoom_home_base: 'https://zoomvibes.j4red4llen.com/api/zoom-home',
 
   /*
    * Default scopes for General Apps (in-client Zoom Apps)
@@ -388,10 +392,23 @@ export function buildZoomAppManifest(options: {
     projectId,
   } = options;
 
-  // Build home URI using the WebContainer preview URL if previewId provided
-  const homeUri = previewId
-    ? `${ZOOM_APP_DEFAULTS.webcontainer_preview_base}/${previewId}`
-    : ZOOM_APP_DEFAULTS.webcontainer_preview_base;
+  /*
+   * Build home URI - use the dynamic zoom-home endpoint with appId/projectId
+   * This endpoint will look up the current WebContainer preview URL and redirect.
+   * If previewId is provided, use direct WebContainer URL for backwards compatibility.
+   */
+  let homeUri: string;
+
+  if (previewId) {
+    // Direct WebContainer URL if previewId is known
+    homeUri = `${ZOOM_APP_DEFAULTS.webcontainer_preview_base}/${previewId}`;
+  } else if (projectId) {
+    // Dynamic home URL that looks up WebContainer URL at runtime
+    homeUri = `${ZOOM_APP_DEFAULTS.zoom_home_base}/${projectId}`;
+  } else {
+    // Fallback to base preview URL (will show waiting page)
+    homeUri = ZOOM_APP_DEFAULTS.webcontainer_preview_base;
+  }
 
   // Convert string scopes to scope objects
   const scopeObjects: ZoomScopeObject[] = scopes.map((scope) => ({
@@ -536,6 +553,19 @@ export async function createZoomAppWithProject(
     appId: result.app_id,
     appName: options.appName,
   });
+
+  /*
+   * Register in zoom-app-registry for dynamic home URL resolution
+   * The registry uses projectId as the key, enabling /api/zoom-home/{projectId} to work
+   */
+  registerZoomApp({
+    appId: projectId, // Use projectId as the registry key
+    appName: options.appName,
+    clientId: result.credentials.client_id,
+    previewId: options.previewId, // May be undefined initially
+  });
+
+  console.log(`[ZoomAPI] Registered app in zoom-app-registry with key: ${projectId}`);
 
   // Get the redirect URI for reference
   const redirectUri = getProjectRedirectUri(projectId, ZOOM_APP_DEFAULTS.base_url);
