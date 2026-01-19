@@ -170,7 +170,7 @@ ${value.content}
                  */
                 ...filteredMessages,
               ];
-              restoreSnapshot(mixedId);
+              restoreSnapshot(mixedId, validSnapshot);
             }
 
             setInitialMessages(filteredMessages);
@@ -252,7 +252,8 @@ ${value.content}
       }
     });
 
-    // workbenchStore.files.setKey(snapshot?.files)
+    // Update the workbench store so the UI shows the files
+    workbenchStore.files.set(validSnapshot.files);
   }, []);
 
   return {
