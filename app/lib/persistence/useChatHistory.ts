@@ -63,11 +63,25 @@ export function useChatHistory() {
     }
 
     if (mixedId) {
-      Promise.all([
-        getMessages(db, mixedId),
-        getSnapshot(db, mixedId), // Fetch snapshot from DB
-      ])
-        .then(async ([storedMessages, snapshot]) => {
+      /*
+       * First get the messages to retrieve the internal chatId,
+       * then use that chatId to fetch the snapshot.
+       * This is necessary because snapshots are keyed by internal chatId,
+       * not by urlId (which mixedId might be).
+       */
+      getMessages(db, mixedId)
+        .then(async (storedMessages) => {
+          // Now fetch snapshot using the INTERNAL chatId, not the URL mixedId
+          const internalChatId = storedMessages?.id;
+          console.log('[useChatHistory] Loading chat. mixedId:', mixedId, 'internalChatId:', internalChatId);
+
+          const snapshot = internalChatId ? await getSnapshot(db, internalChatId) : undefined;
+
+          console.log(
+            '[useChatHistory] Snapshot loaded:',
+            snapshot ? `${Object.keys(snapshot.files || {}).length} files` : 'none',
+          );
+
           if (storedMessages && storedMessages.messages.length > 0) {
             /*
              * const snapshotStr = localStorage.getItem(`snapshot:${mixedId}`); // Remove localStorage usage
