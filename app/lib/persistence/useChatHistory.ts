@@ -90,6 +90,17 @@ export function useChatHistory() {
             const validSnapshot = snapshot || { chatIndex: '', files: {} }; // Ensure snapshot is not undefined
             const summary = validSnapshot.summary;
 
+            /*
+             * ALWAYS restore files from snapshot if they exist.
+             * This ensures files are visible even when chatIndex doesn't match a message.
+             */
+            const hasFilesToRestore = Object.keys(validSnapshot?.files || {}).length > 0;
+
+            if (hasFilesToRestore) {
+              console.log('[useChatHistory] Restoring', Object.keys(validSnapshot.files).length, 'files from snapshot');
+              restoreSnapshot(mixedId, validSnapshot);
+            }
+
             const rewindId = searchParams.get('rewindTo');
             let startingIdx = -1;
             const endingIdx = rewindId
